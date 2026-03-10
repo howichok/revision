@@ -9,8 +9,10 @@ import {
   CheckCircle2,
   Sparkles,
   Target,
+  Zap,
 } from "lucide-react";
 import { Badge, Button, Card, ProgressBar } from "@/components/ui";
+import { QuickQuiz } from "@/components/revision/quick-quiz";
 import {
   analyzeTopicDiagnosticSession,
   getDiagnosticTopics,
@@ -20,6 +22,7 @@ import {
 } from "@/lib/diagnostic";
 import { getBrowserSupabaseClient } from "@/lib/supabase/client";
 import { getSupabaseConfig } from "@/lib/supabase/config";
+import { cn } from "@/lib/utils";
 import type {
   DiagnosticFollowUpEntry,
   DiagnosticPointStatus,
@@ -32,6 +35,7 @@ interface DiagnosticWorkspaceProps {
   onComplete: (result: DiagnosticResult) => Promise<void>;
 }
 
+type WorkspaceMode = "diagnose" | "quiz";
 type Stage = "selection" | "intake" | "follow-up";
 type DiagnosticTopicOption = ReturnType<typeof getDiagnosticTopics>[number];
 
@@ -79,6 +83,7 @@ export function DiagnosticWorkspace({
   const [databaseTopics, setDatabaseTopics] = useState<DiagnosticTopicOption[]>(
     () => getDiagnosticTopics()
   );
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("diagnose");
   const [previewTopicId, setPreviewTopicId] = useState(() =>
     getInitialTopicId(diagnostic)
   );
@@ -300,123 +305,171 @@ export function DiagnosticWorkspace({
 
           {stage === "selection" ? (
             <div className="space-y-8">
-              <div className="mx-auto max-w-3xl text-center">
-                <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-accent">
-                  <BrainCircuit size={12} />
-                  Adaptive Diagnostic Workspace
-                </div>
-                <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-                  Start from a topic, not a quiz stack.
-                </h1>
-                <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-muted">
-                  Select one topic, explain what you already know, then let the
-                  system map that freeform answer against the curriculum.
-                </p>
-              </div>
-
-              {previewTopic && previewDefinition && (
-                <div className="flex justify-center">
-                  <motion.div
-                    layoutId={`diagnostic-topic-${previewTopic.id}`}
-                    className="w-full max-w-3xl rounded-[30px] border border-accent/20 bg-[linear-gradient(145deg,rgba(139,92,246,0.18),rgba(17,17,19,0.95)_42%,rgba(17,17,19,1))] p-6 shadow-[0_0_40px_-22px_rgba(139,92,246,0.7)]"
+              {/* ── Mode tabs ── */}
+              <div className="flex justify-center">
+                <div className="inline-flex items-center gap-1 rounded-2xl border border-border bg-surface/60 p-1">
+                  <button
+                    onClick={() => setWorkspaceMode("diagnose")}
+                    className={cn(
+                      "flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-medium transition-all cursor-pointer",
+                      workspaceMode === "diagnose"
+                        ? "bg-card text-foreground shadow-sm border border-border"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
                   >
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-3">
-                          <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-2xl">
-                            {previewTopic.icon}
-                          </span>
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                              Featured topic
-                            </p>
-                            <h2 className="text-2xl font-semibold text-foreground">
-                              {previewTopic.label}
-                            </h2>
-                          </div>
-                        </div>
-                        <p className="max-w-2xl text-sm leading-relaxed text-muted">
-                          {previewDefinition.description}
-                        </p>
-                      </div>
-
-                      <div className="flex flex-wrap gap-2 sm:max-w-[240px] sm:justify-end">
-                        <Badge variant="accent">{previewDefinition.points.length} points</Badge>
-                        <Badge variant="default">Freeform first</Badge>
-                        {previewScore && (
-                          <Badge variant="warning">
-                            {Math.round((previewScore.score / previewScore.maxScore) * 100)}%
-                          </Badge>
-                        )}
-                        {previewReport && (
-                          <Badge variant="success">
-                            {Math.round(previewReport.confidence * 100)}% confidence
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                      {previewDefinition.points.slice(0, 3).map((point) => (
-                        <div key={point.id} className="rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                            {point.id}
-                          </p>
-                          <p className="mt-1 text-sm font-medium text-foreground">{point.label}</p>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <p className="text-xs text-muted-foreground">
-                        Deterministic matching only. No hosted AI model is used here.
-                      </p>
-                      <Button size="lg" onClick={() => startTopic(previewTopic.id)}>
-                        Diagnose {previewTopic.label}
-                        <ArrowRight size={16} />
-                      </Button>
-                    </div>
-                  </motion.div>
+                    <BrainCircuit size={14} />
+                    Adaptive Diagnostic
+                  </button>
+                  <button
+                    onClick={() => setWorkspaceMode("quiz")}
+                    className={cn(
+                      "flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-medium transition-all cursor-pointer",
+                      workspaceMode === "quiz"
+                        ? "bg-card text-foreground shadow-sm border border-border"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <Zap size={14} />
+                    Quick Quiz
+                  </button>
                 </div>
-              )}
+              </div>
 
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                {topics.map((topic) => {
-                  const definition = getTopicDiagnosticDefinition(topic.id);
-                  const structured = diagnostic?.topicDiagnostics?.some((report) => report.topicId === topic.id);
-                  const isPreview = previewTopicId === topic.id;
+              {workspaceMode === "quiz" ? (
+                <QuickQuiz onClose={() => setWorkspaceMode("diagnose")} />
+              ) : (
+                <>
+                  {/* ── Diagnose header ── */}
+                  <div className="mx-auto max-w-3xl text-center">
+                    <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-accent">
+                      <BrainCircuit size={12} />
+                      Adaptive Diagnostic Workspace
+                    </div>
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+                      Start from a topic, not a quiz stack.
+                    </h1>
+                    <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-muted">
+                      Select one topic, explain what you already know, then let the
+                      system map that freeform answer against the curriculum.
+                    </p>
+                  </div>
 
-                  return (
-                    <button
-                      key={topic.id}
-                      type="button"
-                      onClick={() => setPreviewTopicId(topic.id)}
-                      className={`rounded-2xl border px-4 py-4 text-left transition-colors ${
-                        isPreview
-                          ? "border-accent/40 bg-accent/10"
-                          : "border-border bg-surface/40 hover:border-accent/20 hover:bg-card/80"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <span className="flex h-10 w-10 items-center justify-center rounded-2xl border border-border bg-card text-lg">
-                            {topic.icon}
-                          </span>
-                          <div>
-                            <p className="text-sm font-semibold text-foreground">{topic.label}</p>
-                            <p className="text-xs text-muted-foreground">{definition?.points.length ?? 0} mapped points</p>
+                  {/* ── Featured topic preview ── */}
+                  {previewTopic && previewDefinition && (
+                    <div className="flex justify-center">
+                      <motion.div
+                        layoutId={`diagnostic-topic-${previewTopic.id}`}
+                        className="w-full max-w-3xl rounded-[30px] border border-accent/20 bg-[linear-gradient(145deg,rgba(139,92,246,0.18),rgba(17,17,19,0.95)_42%,rgba(17,17,19,1))] p-6 shadow-[0_0_40px_-22px_rgba(139,92,246,0.7)]"
+                      >
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-3">
+                              <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-2xl">
+                                {previewTopic.icon}
+                              </span>
+                              <div>
+                                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                                  Featured topic
+                                </p>
+                                <h2 className="text-2xl font-semibold text-foreground">
+                                  {previewTopic.label}
+                                </h2>
+                              </div>
+                            </div>
+                            <p className="max-w-2xl text-sm leading-relaxed text-muted">
+                              {previewDefinition.description}
+                            </p>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2 sm:max-w-[240px] sm:justify-end">
+                            <Badge variant="accent">{previewDefinition.points.length} points</Badge>
+                            <Badge variant="default">Freeform first</Badge>
+                            {previewScore && (
+                              <Badge variant="warning">
+                                {Math.round((previewScore.score / previewScore.maxScore) * 100)}%
+                              </Badge>
+                            )}
+                            {previewReport && (
+                              <Badge variant="success">
+                                {Math.round(previewReport.confidence * 100)}% confidence
+                              </Badge>
+                            )}
                           </div>
                         </div>
-                        <Badge variant={structured ? "success" : "default"}>
-                          {structured ? "Mapped" : "New"}
-                        </Badge>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
+
+                        <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                          {previewDefinition.points.slice(0, 3).map((point) => (
+                            <div key={point.id} className="rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                                {point.id}
+                              </p>
+                              <p className="mt-1 text-sm font-medium text-foreground">{point.label}</p>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <p className="text-xs text-muted-foreground">
+                            Deterministic matching only. No hosted AI model is used here.
+                          </p>
+                          <div className="flex gap-2">
+                            <Button size="lg" onClick={() => startTopic(previewTopic.id)}>
+                              Diagnose {previewTopic.label}
+                              <ArrowRight size={16} />
+                            </Button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    </div>
+                  )}
+
+                  {/* ── Topic grid ── */}
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    {topics.map((topic) => {
+                      const definition = getTopicDiagnosticDefinition(topic.id);
+                      const structured = diagnostic?.topicDiagnostics?.some((report) => report.topicId === topic.id);
+                      const isPreview = previewTopicId === topic.id;
+
+                      return (
+                        <button
+                          key={topic.id}
+                          type="button"
+                          onClick={() => setPreviewTopicId(topic.id)}
+                          className={cn(
+                            "rounded-2xl border px-4 py-4 text-left transition-all cursor-pointer group",
+                            isPreview
+                              ? "border-accent/40 bg-accent/10 shadow-[0_0_20px_-8px_rgba(139,92,246,0.3)]"
+                              : "border-border bg-surface/40 hover:border-accent/20 hover:bg-card/80 hover:shadow-[0_4px_16px_-4px_rgba(139,92,246,0.08)]"
+                          )}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                              <span className={cn(
+                                "flex h-10 w-10 items-center justify-center rounded-2xl border text-lg transition-colors",
+                                isPreview
+                                  ? "border-accent/20 bg-accent/10"
+                                  : "border-border bg-card group-hover:border-accent/15"
+                              )}>
+                                {topic.icon}
+                              </span>
+                              <div>
+                                <p className="text-sm font-semibold text-foreground">{topic.label}</p>
+                                <p className="text-xs text-muted-foreground">{definition?.points.length ?? 0} mapped points</p>
+                              </div>
+                            </div>
+                            <Badge variant={structured ? "success" : "default"}>
+                              {structured ? "Mapped" : "New"}
+                            </Badge>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </div>
           ) : (
+            /* ─── Active diagnostic (intake / follow-up) ─── */
             <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
               <div className="space-y-4 xl:sticky xl:top-24 xl:self-start">
                 {activeTopic && activeDefinition && (
@@ -463,11 +516,12 @@ export function DiagnosticWorkspace({
                         key={topic.id}
                         type="button"
                         onClick={() => startTopic(topic.id)}
-                        className={`flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                        className={cn(
+                          "flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left transition-colors cursor-pointer",
                           topic.id === activeTopic?.id
                             ? "border-accent/30 bg-accent/10 text-foreground"
                             : "border-border bg-surface/30 text-muted-foreground hover:border-accent/20 hover:bg-card"
-                        }`}
+                        )}
                       >
                         <span className="flex items-center gap-2 text-sm font-medium">
                           <span>{topic.icon}</span>
@@ -492,7 +546,7 @@ export function DiagnosticWorkspace({
                         <div className="flex items-center gap-2">
                           <Sparkles size={14} className="text-accent" />
                           <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                            {stage === "intake" ? "Stage C - Freeform input" : "Stage E - Adaptive follow-up"}
+                            {stage === "intake" ? "Freeform input" : "Adaptive follow-up"}
                           </span>
                         </div>
                         <h3 className="mt-2 text-xl font-semibold text-foreground">
@@ -543,9 +597,14 @@ export function DiagnosticWorkspace({
                     )}
 
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                      <p className="text-[11px] text-muted-foreground/70">
-                        Deterministic matching against structured topic points, key terms, misconception rules, and follow-up history.
-                      </p>
+                      <div className="space-y-1">
+                        <p className="text-[11px] text-muted-foreground/70">
+                          Deterministic matching against structured topic points, key terms, misconception rules, and follow-up history.
+                        </p>
+                        <p className="text-[11px] text-muted-foreground/50 tabular-nums">
+                          {(stage === "intake" ? freeformResponse : followUpResponse).trim().split(/\s+/).filter(Boolean).length} words
+                        </p>
+                      </div>
                       <div className="flex flex-wrap gap-2">
                         {stage === "follow-up" && analysis && (
                           <Button variant="outline" onClick={() => void saveReport(analysis)} disabled={isSubmitting}>
@@ -568,7 +627,7 @@ export function DiagnosticWorkspace({
                         <div>
                           <div className="flex items-center gap-2">
                             <Target size={15} className="text-accent" />
-                            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Stage D/F - Coverage map</span>
+                            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Coverage map</span>
                           </div>
                           <h3 className="mt-2 text-lg font-semibold text-foreground">Point-by-point curriculum coverage</h3>
                         </div>

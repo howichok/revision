@@ -2,14 +2,31 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
-import { AlertCircle, ArrowRight, ArrowLeft, CheckCircle, Layers } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  AlertCircle,
+  ArrowRight,
+  ArrowLeft,
+  Check,
+  Layers,
+  Sparkles,
+  Target,
+} from "lucide-react";
 import { useAppData } from "@/components/providers/app-data-provider";
 import { Button } from "@/components/ui";
 import { TopicAccordion } from "@/components/onboarding/topic-accordion";
 import { SmartInputPanel } from "@/components/onboarding/smart-input-panel";
 import { TOPICS, getTopicTree, getTopicById } from "@/lib/types";
 import type { TopicTree } from "@/lib/types";
+
+const EASE = [0.25, 0.46, 0.45, 0.94] as [number, number, number, number];
+
+const STEPS = [
+  { label: "Profile", done: true },
+  { label: "Weak Areas", done: true },
+  { label: "Focus Breakdown", active: true },
+  { label: "Dashboard", done: false },
+];
 
 export default function FocusBreakdownPage() {
   const router = useRouter();
@@ -24,14 +41,11 @@ export default function FocusBreakdownPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!onboarding) {
-      return;
-    }
+    if (!onboarding) return;
     setWeakAreas(onboarding.weakAreas);
     setSelectedSubtopics(onboarding.focusBreakdown?.selectedSubtopics ?? {});
     setFreeTextNotes(onboarding.focusBreakdown?.freeTextNotes ?? {});
     setGlobalFreeText(onboarding.focusBreakdown?.globalNote ?? "");
-    // Auto-open the first topic
     if (onboarding.weakAreas.length > 0) {
       setOpenTopicId(onboarding.weakAreas[0]);
     }
@@ -55,7 +69,6 @@ export default function FocusBreakdownPage() {
     setFreeTextNotes((prev) => ({ ...prev, [topicId]: text }));
   }, []);
 
-  // Auto-topic detection: add a new topic to weak areas and open it
   const handleAutoTopicAdd = useCallback((topicId: string) => {
     setWeakAreas((prev) => {
       if (prev.includes(topicId)) return prev;
@@ -64,7 +77,6 @@ export default function FocusBreakdownPage() {
     setOpenTopicId(topicId);
   }, []);
 
-  // Global match select: add topic, open it, select subtopic
   const handleGlobalMatchSelect = useCallback((topicId: string, subtopicId: string) => {
     setWeakAreas((prev) => {
       if (prev.includes(topicId)) return prev;
@@ -81,7 +93,6 @@ export default function FocusBreakdownPage() {
   async function handleContinue() {
     setError("");
     setIsSaving(true);
-
     try {
       await saveFocusBreakdown({
         weakAreas,
@@ -114,93 +125,151 @@ export default function FocusBreakdownPage() {
 
   return (
     <div className="min-h-screen relative overflow-hidden">
-      <div className="absolute top-[-15%] left-[60%] w-[500px] h-[500px] bg-accent/2 rounded-full blur-[80px] pointer-events-none" />
-      <div className="absolute bottom-[-10%] left-[-5%] w-[400px] h-[400px] bg-accent/2 rounded-full blur-[80px] pointer-events-none" />
+      {/* Ambient background */}
+      <div className="absolute top-[-20%] left-[55%] w-[700px] h-[600px] bg-accent/3 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-15%] left-[-8%] w-[500px] h-[400px] bg-accent/2 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute top-[40%] right-[-10%] w-[300px] h-[300px] bg-accent/2 rounded-full blur-[80px] pointer-events-none" />
 
-      <div className="relative z-10 max-w-6xl mx-auto px-6 py-8">
-        {/* Progress indicator */}
+      <div className="relative z-10 max-w-[1200px] mx-auto px-6 py-8">
+        {/* ── Progress stepper ── */}
         <motion.div
-          initial={{ opacity: 0, y: -10 }}
+          initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className="flex items-center gap-2 mb-8 justify-center"
+          transition={{ duration: 0.5, ease: EASE }}
+          className="flex items-center justify-center gap-0 mb-10"
         >
-          <div className="flex items-center gap-1.5">
-            <CheckCircle size={16} className="text-accent" />
-            <span className="text-xs text-accent font-medium">Profile</span>
-          </div>
-          <div className="w-8 h-px bg-accent/30" />
-          <div className="flex items-center gap-1.5">
-            <CheckCircle size={16} className="text-accent" />
-            <span className="text-xs text-accent font-medium">Weak Areas</span>
-          </div>
-          <div className="w-8 h-px bg-accent/30" />
-          <div className="flex items-center gap-1.5">
-            <div className="w-4 h-4 rounded-full bg-accent flex items-center justify-center">
-              <span className="text-[10px] text-white font-bold">3</span>
+          {STEPS.map((step, i) => (
+            <div key={step.label} className="flex items-center">
+              <div className="flex items-center gap-2">
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 20, delay: i * 0.08 }}
+                  className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold transition-all ${
+                    step.done
+                      ? "bg-accent/15 text-accent border border-accent/30"
+                      : step.active
+                        ? "bg-accent text-white shadow-[0_0_16px_-4px_rgba(139,92,246,0.5)]"
+                        : "bg-surface border border-border text-muted-foreground"
+                  }`}
+                >
+                  {step.done ? <Check size={13} strokeWidth={3} /> : i + 1}
+                </motion.div>
+                <span
+                  className={`text-xs font-medium hidden sm:block ${
+                    step.active ? "text-foreground" : step.done ? "text-accent/70" : "text-muted-foreground"
+                  }`}
+                >
+                  {step.label}
+                </span>
+              </div>
+              {i < STEPS.length - 1 && (
+                <motion.div
+                  initial={{ scaleX: 0 }}
+                  animate={{ scaleX: 1 }}
+                  transition={{ duration: 0.4, delay: 0.2 + i * 0.08 }}
+                  className={`w-10 sm:w-14 h-px mx-2 origin-left ${
+                    step.done ? "bg-accent/30" : "bg-border"
+                  }`}
+                />
+              )}
             </div>
-            <span className="text-xs text-foreground font-medium">Focus Breakdown</span>
-          </div>
-          <div className="w-8 h-px bg-border" />
-          <div className="flex items-center gap-1.5">
-            <div className="w-4 h-4 rounded-full bg-border flex items-center justify-center">
-              <span className="text-[10px] text-muted-foreground font-bold">4</span>
-            </div>
-            <span className="text-xs text-muted-foreground font-medium">Dashboard</span>
-          </div>
+          ))}
         </motion.div>
 
-        {/* Header */}
+        {/* ── Header ── */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.1 }}
-          className="text-center mb-8"
+          transition={{ duration: 0.5, delay: 0.12, ease: EASE }}
+          className="text-center mb-10"
         >
-          <h1 className="text-2xl sm:text-3xl font-bold mb-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent/8 border border-accent/15 mb-4">
+            <Target size={12} className="text-accent" />
+            <span className="text-[11px] font-medium text-accent">Step 3 of 4</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold mb-3 tracking-tight">
             Let&apos;s dig a bit deeper
           </h1>
-          <p className="text-muted text-sm max-w-lg mx-auto">
-            Pick the specific bits that feel shaky, or type what&apos;s confusing you and we&apos;ll
-            try to match it. This helps us focus your revision even more.
+          <p className="text-muted text-sm max-w-xl mx-auto leading-relaxed">
+            Pick the specific bits that feel shaky, or type what&apos;s confusing you and
+            we&apos;ll try to match it. This helps us focus your revision even more.
           </p>
         </motion.div>
 
-        {/* Two-column layout */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ type: "spring", stiffness: 360, damping: 32, delay: 0.15 }}
-          className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-8"
-        >
-          {/* Left column — Accordions */}
-          <div className="lg:col-span-2 space-y-3">
-            <div className="flex items-center gap-2 mb-4">
-              <Layers size={15} className="text-muted-foreground" />
-              <p className="text-xs font-medium text-muted uppercase tracking-wider">Your weak topics</p>
+        {/* ── Two-column layout ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
+          {/* Left column — Topic accordions */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 30, delay: 0.2 }}
+            className="lg:col-span-5 space-y-3"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-surface border border-border flex items-center justify-center">
+                  <Layers size={12} className="text-muted-foreground" />
+                </div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Your weak topics
+                </p>
+              </div>
+              {totalSelected > 0 && (
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 25 }}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent/10 border border-accent/20"
+                >
+                  <Sparkles size={10} className="text-accent" />
+                  <span className="text-[10px] font-semibold text-accent tabular-nums">
+                    {totalSelected} selected
+                  </span>
+                </motion.div>
+              )}
             </div>
-            {weakAreas.map((topicId) => {
-              const tree = getTopicTree(topicId);
-              const topic = TOPICS.find((t) => t.id === topicId);
-              if (!tree || !topic) return null;
-              return (
-                <TopicAccordion
-                  key={topicId}
-                  tree={tree}
-                  topicIcon={topic.icon}
-                  topicLabel={topic.label}
-                  isOpen={openTopicId === topicId}
-                  onToggle={() => handleAccordionToggle(topicId)}
-                  selectedSubtopics={selectedSubtopics[topicId] || []}
-                  onSubtopicToggle={(subId) => handleSubtopicToggle(topicId, subId)}
-                />
-              );
-            })}
-          </div>
 
-          {/* Right column — Smart input (larger, no clip) */}
-          <div className="lg:col-span-3 overflow-visible">
-            <div className="lg:sticky lg:top-24 min-h-[560px] max-h-[calc(100vh-6rem)] flex flex-col pl-2 pr-4 pb-4 overflow-visible">
+            <AnimatePresence>
+              {weakAreas.map((topicId, index) => {
+                const tree = getTopicTree(topicId);
+                const topic = TOPICS.find((t) => t.id === topicId);
+                if (!tree || !topic) return null;
+                return (
+                  <motion.div
+                    key={topicId}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      type: "spring",
+                      stiffness: 350,
+                      damping: 28,
+                      delay: 0.25 + index * 0.06,
+                    }}
+                  >
+                    <TopicAccordion
+                      tree={tree}
+                      topicIcon={topic.icon}
+                      topicLabel={topic.label}
+                      isOpen={openTopicId === topicId}
+                      onToggle={() => handleAccordionToggle(topicId)}
+                      selectedSubtopics={selectedSubtopics[topicId] || []}
+                      onSubtopicToggle={(subId) => handleSubtopicToggle(topicId, subId)}
+                    />
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+          </motion.div>
+
+          {/* Right column — Smart input panel */}
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 30, delay: 0.25 }}
+            className="lg:col-span-7"
+          >
+            <div className="lg:sticky lg:top-8 min-h-[520px] max-h-[calc(100vh-6rem)] flex flex-col">
               <SmartInputPanel
                 activeTree={activeTree || null}
                 topicLabel={activeTopic?.label ?? ""}
@@ -219,18 +288,18 @@ export default function FocusBreakdownPage() {
                 onGlobalMatchSelect={handleGlobalMatchSelect}
               />
             </div>
-          </div>
-        </motion.div>
+          </motion.div>
+        </div>
 
-        {/* Bottom CTA */}
+        {/* ── Bottom CTA ── */}
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4 }}
-          className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-border"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5, ease: EASE }}
+          className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t border-border/60"
         >
-          <Button variant="ghost" size="sm" onClick={handleBack}>
-            <ArrowLeft size={14} />
+          <Button variant="ghost" size="sm" onClick={handleBack} className="group">
+            <ArrowLeft size={14} className="transition-transform group-hover:-translate-x-0.5" />
             Back to topics
           </Button>
 
@@ -252,11 +321,16 @@ export default function FocusBreakdownPage() {
             </Button>
           </div>
         </motion.div>
+
         {error && (
-          <div className="mt-4 flex items-center gap-2 text-sm text-danger bg-danger/10 rounded-lg px-3 py-2.5">
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-4 flex items-center gap-2 text-sm text-danger bg-danger/10 rounded-xl px-4 py-3"
+          >
             <AlertCircle size={14} className="shrink-0" />
             {error}
-          </div>
+          </motion.div>
         )}
       </div>
     </div>
