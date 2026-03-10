@@ -1,7 +1,9 @@
 export interface UserProfile {
+  id: string;
   nickname: string;
   email?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface OnboardingData {
@@ -11,9 +13,17 @@ export interface OnboardingData {
 }
 
 export interface DiagnosticResult {
+  id?: string;
   completedAt: string;
   overallScore: number;
+  questionCount?: number;
   topicScores: TopicScore[];
+  version?: number;
+  latestTopicId?: string;
+  assessedTopicIds?: string[];
+  unassessedTopicIds?: string[];
+  recommendedTopicIds?: string[];
+  topicDiagnostics?: TopicDiagnosticReport[];
 }
 
 export interface TopicScore {
@@ -21,6 +31,59 @@ export interface TopicScore {
   score: number;
   maxScore: number;
   category: string;
+}
+
+export type DiagnosticPointStatus =
+  | "covered"
+  | "partial"
+  | "unassessed"
+  | "misconception";
+
+export type DiagnosticFollowUpReason =
+  | "missing-point"
+  | "weak-point"
+  | "misconception"
+  | "low-confidence";
+
+export interface DiagnosticPointAssessment {
+  pointId: string;
+  label: string;
+  status: DiagnosticPointStatus;
+  confidence: number;
+  matchedTerms: string[];
+  missingTerms: string[];
+  evidence: string[];
+  notes?: string;
+}
+
+export interface DiagnosticMisconceptionFinding {
+  id: string;
+  pointId?: string;
+  label: string;
+  explanation: string;
+}
+
+export interface DiagnosticFollowUpEntry {
+  id: string;
+  targetedPointId: string;
+  question: string;
+  answer: string;
+  reason: DiagnosticFollowUpReason;
+}
+
+export interface TopicDiagnosticReport {
+  topicId: string;
+  topicLabel: string;
+  topicIcon: string;
+  assessedAt: string;
+  freeformResponse: string;
+  curriculumPoints: DiagnosticPointAssessment[];
+  keyTermsMatched: string[];
+  misconceptions: DiagnosticMisconceptionFinding[];
+  confidence: number;
+  suggestedNextTargets: string[];
+  recommendedMaterialIds: string[];
+  followUps: DiagnosticFollowUpEntry[];
 }
 
 export interface StudyResource {
@@ -38,6 +101,33 @@ export type AppState = {
   onboarding: OnboardingData | null;
   diagnostic: DiagnosticResult | null;
 };
+
+export interface RevisionProgressEntry {
+  id: string;
+  topicId: string;
+  entityId: string;
+  entityType: "subtopic" | "material";
+  status: "not-started" | "in-progress" | "completed";
+  progressPercent: number;
+  completedAt: string | null;
+  updatedAt: string;
+  lastInteractedAt: string;
+}
+
+export interface ActivityLog {
+  id: string;
+  type: string;
+  title: string;
+  topicId: string | null;
+  occurredAt: string;
+  minutesSpent: number;
+  metadata: Record<string, unknown>;
+}
+
+export interface AppBootstrapState extends AppState {
+  revisionProgress: RevisionProgressEntry[];
+  activityHistory: ActivityLog[];
+}
 
 // ─── T-Level Digital Software Development (Year 1) Topics ───
 
@@ -166,6 +256,7 @@ export function getTopicTree(topicId: string): TopicTree | undefined {
 export interface FocusBreakdownData {
   selectedSubtopics: Record<string, string[]>; // topicId -> subtopic ids
   freeTextNotes: Record<string, string>;        // topicId -> user typed text
+  globalNote?: string;
   completedAt: string;
 }
 

@@ -281,17 +281,11 @@ export function SmartInputPanel({
   const [isFocused, setIsFocused] = useState(false);
   const [sentQueries, setSentQueries] = useState<SentQuery[]>([]);
   const [isSending, setIsSending] = useState(false);
-  const [sendPhase, setSendPhase] = useState<"idle" | "stretching" | "holding" | "releasing">("idle");
   const [impulse, setImpulse] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const pendingTextRef = useRef<string>("");
 
   const isGlobalMode = !activeTree;
-
-  useEffect(() => {
-    setSentQueries([]);
-  }, [activeTree?.topicId]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -303,14 +297,10 @@ export function SmartInputPanel({
     if (!freeText.trim() || isSending) return;
 
     const queryText = freeText.trim();
-    pendingTextRef.current = queryText;
     setIsSending(true);
-    setSendPhase("stretching");
 
     setImpulse(true);
     setTimeout(() => setImpulse(false), 150);
-
-    setTimeout(() => setSendPhase("holding"), 250);
 
     setTimeout(() => {
       let matches: SuggestionMatch[] = [];
@@ -354,11 +344,8 @@ export function SmartInputPanel({
       });
 
       setTimeout(() => {
-        setSendPhase("releasing");
         onFreeTextChange("");
-        pendingTextRef.current = "";
         setTimeout(() => {
-          setSendPhase("idle");
           setIsSending(false);
         }, 300);
       }, 120);

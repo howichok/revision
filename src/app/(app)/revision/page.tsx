@@ -1,593 +1,742 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { AnimatePresence } from "framer-motion";
 import {
-  ClipboardCheck,
+  AlertCircle,
+  ArrowRight,
+  BrainCircuit,
+  CheckCircle2,
+  ChevronRight,
+  Clock,
+  RotateCcw,
+  Sparkles,
   Target,
   TrendingUp,
-  ArrowRight,
-  RotateCcw,
-  ChevronRight,
-  Star,
-  BookOpen,
-  Clock,
-  Play,
-  CheckCircle,
 } from "lucide-react";
+import { PageContainer } from "@/components/layout/page-container";
+import { DiagnosticWorkspace } from "@/components/revision/diagnostic-workspace";
+import { getRecommendedMaterialCards } from "@/lib/content";
 import {
+  Badge,
   Button,
   Card,
-  Badge,
-  ProgressBar,
-  ProgressRing,
   MaterialCard,
+  ProgressBar,
 } from "@/components/ui";
-import { PageContainer } from "@/components/layout/page-container";
-import Link from "next/link";
-import { storage } from "@/lib/storage";
+import { useAppData } from "@/components/providers/app-data-provider";
 import {
-  MOCK_DIAGNOSTIC,
-  TOPICS,
-  MOCK_MATERIALS,
-  MOCK_RECENT_ACTIVITY,
+  getTopicById,
+  type DiagnosticPointStatus,
+  type DiagnosticResult,
 } from "@/lib/types";
-import type { DiagnosticResult } from "@/lib/types";
+import {
+  formatRelativeTime,
+  getWeakestTopics,
+  hydrateMaterialsWithProgress,
+  resolveMaterialTopicId,
+} from "@/lib/progress";
 
 const fadeUp = {
-  hidden: { opacity: 0, y: 18 },
+  hidden: { opacity: 0, y: 12 },
   visible: (i: number) => ({
     opacity: 1,
     y: 0,
     transition: {
       delay: i * 0.06,
-      type: "spring",
-      stiffness: 360,
-      damping: 32,
-      mass: 0.9,
+      duration: 0.35,
+      ease: [0.25, 0.46, 0.45, 0.94] as [number, number, number, number],
     },
   }),
 };
 
-function getScoreVariant(pct: number): "success" | "warning" | "danger" {
-  if (pct >= 75) return "success";
-  if (pct >= 50) return "warning";
-  return "danger";
+function getScoreVariant(pct: number) {
+  if (pct >= 75) return "success" as const;
+  if (pct >= 45) return "warning" as const;
+  return "danger" as const;
 }
 
-const DIAGNOSTIC_TOPICS = TOPICS.filter((t) => t.id !== "esp");
-
-interface DiagnosticQuestion {
-  id: number;
-  topicIcon: string;
-  topicLabel: string;
-  question: string;
-  options: string[];
+function getPointVariant(status: DiagnosticPointStatus) {
+  if (status === "covered") return "success" as const;
+  if (status === "partial") return "warning" as const;
+  if (status === "misconception") return "danger" as const;
+  return "default" as const;
 }
 
-const DIAGNOSTIC_QUESTIONS: DiagnosticQuestion[] = [
-  { id: 0, topicIcon: "🧩", topicLabel: "Problem Solving", question: "What does decomposition mean in computational thinking?", options: ["Breaking a problem into smaller parts", "Removing unnecessary code", "Testing the final program", "Writing pseudocode"] },
-  { id: 1, topicIcon: "💻", topicLabel: "Intro to Programming", question: "Which of these is a valid Python data type?", options: ["integer", "paragraph", "cell", "row"] },
-  { id: 2, topicIcon: "🔒", topicLabel: "Security", question: "What is the primary purpose of encryption?", options: ["Make data unreadable without a key", "Delete old files securely", "Speed up network traffic", "Compress large databases"] },
-  { id: 3, topicIcon: "⚖️", topicLabel: "Legislation", question: "Which UK law covers personal data protection?", options: ["Data Protection Act 2018", "Freedom of Information Act", "Computer Misuse Act", "Copyright Act 1988"] },
-  { id: 4, topicIcon: "🗄️", topicLabel: "Data", question: "What does SQL stand for?", options: ["Structured Query Language", "Simple Question Logic", "System Quality Layer", "Standard Queue List"] },
-  { id: 5, topicIcon: "🖥️", topicLabel: "Digital Environments", question: "What is cloud computing?", options: ["Delivering services over the internet", "Storing files on a USB drive", "Using a local area network only", "Running programs without hardware"] },
-];
-
-type DiagnosticPhase = "intro" | "questions" | "analysing";
+function getPointLabel(status: DiagnosticPointStatus) {
+  if (status === "covered") return "Covered well";
+  if (status === "partial") return "Partially covered";
+  if (status === "misconception") return "Misconception detected";
+  return "Not assessed";
+}
 
 export default function RevisionPage() {
-  const [diagnostic, setDiagnostic] = useState<DiagnosticResult | null>(null);
-  const [phase, setPhase] = useState<DiagnosticPhase>("intro");
-  const [questionIndex, setQuestionIndex] = useState(0);
-  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
-  const [diagnosticStep, setDiagnosticStep] = useState(-1);
+  const {
+    activityHistory,
+    diagnostic,
+    revisionProgress,
+    saveDiagnosticResult,
+    trackMaterialProgress,
+  } = useAppData();
+  const [isRetaking, setIsRetaking] = useState(false);
+  const [focusedTopicId, setFocusedTopicId] = useState<string | null>(null);
   const [justCompleted, setJustCompleted] = useState(false);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [pageError, setPageError] = useState("");
 
-  useEffect(() => {
-    setDiagnostic(storage.getDiagnostic());
-  }, []);
-
-  function handleStartDiagnostic() {
-    setPhase("questions");
-    setQuestionIndex(0);
-    setSelectedAnswer(null);
+  async function handleDiagnosticComplete(result: DiagnosticResult) {
+    await saveDiagnosticResult(result);
+    setFocusedTopicId(result.latestTopicId ?? null);
+    setIsRetaking(false);
+    setJustCompleted(true);
+    setTimeout(() => setJustCompleted(false), 5000);
   }
 
-  function handleAnswerSelect(optionIndex: number) {
-    setSelectedAnswer(optionIndex);
-    setTimeout(() => {
-      if (questionIndex < DIAGNOSTIC_QUESTIONS.length - 1) {
-        setQuestionIndex((prev) => prev + 1);
-        setSelectedAnswer(null);
-      } else {
-        startAnalysisAnimation();
-      }
-    }, 600);
-  }
-
-  function startAnalysisAnimation() {
-    setPhase("analysing");
-    setDiagnosticStep(0);
-
-    let step = 0;
-    intervalRef.current = setInterval(() => {
-      step += 1;
-      if (step < DIAGNOSTIC_TOPICS.length) {
-        setDiagnosticStep(step);
-      } else if (step === DIAGNOSTIC_TOPICS.length) {
-        setDiagnosticStep(DIAGNOSTIC_TOPICS.length);
-      } else {
-        if (intervalRef.current) clearInterval(intervalRef.current);
-        storage.setDiagnostic(MOCK_DIAGNOSTIC);
-        setDiagnostic(MOCK_DIAGNOSTIC);
-        setPhase("intro");
-        setDiagnosticStep(-1);
-        setJustCompleted(true);
-        setTimeout(() => setJustCompleted(false), 5000);
-      }
-    }, 500);
-  }
-
-  useEffect(() => {
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, []);
-
-  function handleResetDiagnostic() {
-    localStorage.removeItem("kosti_diagnostic");
-    setDiagnostic(null);
-    setPhase("intro");
-    setJustCompleted(false);
-  }
-
-  if (!diagnostic) {
-    const isCalculating = diagnosticStep === DIAGNOSTIC_TOPICS.length;
-    const analysisPct = phase === "analysing"
-      ? isCalculating ? 100 : Math.round(((diagnosticStep + 1) / DIAGNOSTIC_TOPICS.length) * 90)
-      : 0;
-    const currentQuestion = DIAGNOSTIC_QUESTIONS[questionIndex];
-    const questionProgressPct = Math.round(((questionIndex + 1) / DIAGNOSTIC_QUESTIONS.length) * 100);
-
+  if (!diagnostic || isRetaking) {
     return (
-      <PageContainer size="md">
-        <AnimatePresence mode="wait">
-          {/* ─── Phase: Intro ─── */}
-          {phase === "intro" && (
-            <motion.div
-              key="intro"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.4 }}
-              className="flex flex-col items-center justify-center min-h-[60vh]"
-            >
-              <div className="text-center max-w-lg">
-                <div className="w-20 h-20 rounded-2xl bg-accent/10 flex items-center justify-center mx-auto mb-8">
-                  <ClipboardCheck size={36} className="text-accent" />
-                </div>
-                <h1 className="text-2xl sm:text-3xl font-bold mb-3">Diagnostic Test</h1>
-                <p className="text-muted text-sm leading-relaxed mb-2">
-                  Before we can build your revision plan, we need to see where
-                  you&apos;re at across all the Year 1 topics.
+      <PageContainer size="lg">
+        <div className="space-y-5">
+          {diagnostic && (
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Revision diagnostic
                 </p>
-                <p className="text-muted-foreground text-sm mb-10">
-                  Covers all 8 core topics. Your results shape your entire revision experience.
-                </p>
-                <Button size="lg" onClick={handleStartDiagnostic} className="group">
-                  Start Diagnostic
-                  <ArrowRight size={18} className="transition-transform group-hover:translate-x-0.5" />
-                </Button>
-                <div className="mt-8 flex items-center justify-center gap-6 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1.5"><ClipboardCheck size={12} />~30 questions</span>
-                  <span className="flex items-center gap-1.5"><Target size={12} />8 topic areas</span>
-                </div>
-                <div className="mt-10 flex flex-wrap gap-2 justify-center">
-                  {DIAGNOSTIC_TOPICS.map((topic) => (
-                    <span key={topic.id} className="px-3 py-1.5 bg-card border border-border rounded-lg text-xs text-muted">
-                      {topic.icon} {topic.label}
-                    </span>
-                  ))}
-                </div>
+                <h1 className="text-2xl font-bold text-foreground">
+                  Adaptive topic-first diagnostic
+                </h1>
               </div>
-            </motion.div>
+              <Button variant="ghost" size="sm" onClick={() => setIsRetaking(false)}>
+                Back to coverage
+              </Button>
+            </div>
           )}
 
-          {/* ─── Phase: Questions ─── */}
-          {phase === "questions" && currentQuestion && (
-            <motion.div
-              key="questions"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.4 }}
-              className="flex flex-col items-center justify-center min-h-[60vh]"
-            >
-              <div className="w-full max-w-lg">
-                {/* Progress header */}
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-muted-foreground">
-                    Question {questionIndex + 1} of {DIAGNOSTIC_QUESTIONS.length}
-                  </span>
-                  <span className="text-xs text-muted-foreground tabular-nums">{questionProgressPct}%</span>
-                </div>
-                <div className="w-full bg-border/40 rounded-full h-1 overflow-hidden mb-8">
-                  <motion.div
-                    className="h-full bg-accent rounded-full"
-                    animate={{ width: `${questionProgressPct}%` }}
-                    transition={{ duration: 0.35, ease: "easeOut" }}
-                  />
-                </div>
-
-                {/* Question card */}
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={questionIndex}
-                    initial={{ opacity: 0, x: 30 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -30 }}
-                    transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
-                  >
-                    <div className="flex items-center gap-2 mb-4">
-                      <span className="text-lg">{currentQuestion.topicIcon}</span>
-                      <span className="text-[11px] text-muted-foreground font-medium tracking-wide uppercase">
-                        {currentQuestion.topicLabel}
-                      </span>
-                    </div>
-                    <h2 className="text-lg font-semibold text-foreground mb-6 leading-snug">
-                      {currentQuestion.question}
-                    </h2>
-
-                    <div className="space-y-2.5">
-                      {currentQuestion.options.map((option, i) => {
-                        const isSelected = selectedAnswer === i;
-                        const isCorrect = i === 0;
-                        const showResult = selectedAnswer !== null;
-                        return (
-                          <motion.button
-                            key={i}
-                            onClick={() => selectedAnswer === null && handleAnswerSelect(i)}
-                            initial={{ opacity: 0, y: 8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: i * 0.06, duration: 0.25 }}
-                            className={`w-full text-left p-3.5 rounded-xl border transition-all duration-200 ${
-                              showResult && isSelected && isCorrect
-                                ? "bg-success/10 border-success/30 text-foreground"
-                                : showResult && isSelected && !isCorrect
-                                  ? "bg-danger/10 border-danger/30 text-foreground"
-                                  : showResult && isCorrect
-                                    ? "bg-success/5 border-success/20 text-foreground"
-                                    : "bg-card border-border hover:border-accent/30 hover:bg-card/80 text-foreground cursor-pointer"
-                            }`}
-                            disabled={selectedAnswer !== null}
-                          >
-                            <div className="flex items-center gap-3">
-                              <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${
-                                showResult && isSelected && isCorrect
-                                  ? "bg-success/20 text-success"
-                                  : showResult && isSelected && !isCorrect
-                                    ? "bg-danger/20 text-danger"
-                                    : showResult && isCorrect
-                                      ? "bg-success/15 text-success"
-                                      : "bg-surface text-muted-foreground"
-                              }`}>
-                                {String.fromCharCode(65 + i)}
-                              </span>
-                              <span className="text-sm">{option}</span>
-                            </div>
-                          </motion.button>
-                        );
-                      })}
-                    </div>
-                  </motion.div>
-                </AnimatePresence>
-              </div>
-            </motion.div>
-          )}
-
-          {/* ─── Phase: Analysing (the existing completion animation) ─── */}
-          {phase === "analysing" && (
-            <motion.div
-              key="analysing"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.35 }}
-              className="flex flex-col items-center justify-center min-h-[60vh]"
-            >
-              <div className="text-center max-w-md w-full">
-                <div className="mb-8">
-                  <ProgressRing
-                    value={analysisPct}
-                    size={100}
-                    strokeWidth={6}
-                    label={isCalculating ? "Done" : `${diagnosticStep + 1}/${DIAGNOSTIC_TOPICS.length}`}
-                  />
-                </div>
-
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={diagnosticStep}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: 0.2 }}
-                    className="mb-6"
-                  >
-                    {isCalculating ? (
-                      <>
-                        <p className="text-sm font-semibold text-foreground">Calculating results...</p>
-                        <p className="text-xs text-muted-foreground mt-1">Building your revision plan</p>
-                      </>
-                    ) : (
-                      <>
-                        <div className="flex items-center justify-center gap-2 mb-1">
-                          <span className="text-lg">{DIAGNOSTIC_TOPICS[diagnosticStep]?.icon}</span>
-                          <p className="text-sm font-semibold text-foreground">
-                            Analysing {DIAGNOSTIC_TOPICS[diagnosticStep]?.label}...
-                          </p>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Topic {diagnosticStep + 1} of {DIAGNOSTIC_TOPICS.length}
-                        </p>
-                      </>
-                    )}
-                  </motion.div>
-                </AnimatePresence>
-
-                <div className="w-full bg-border/40 rounded-full h-1.5 overflow-hidden">
-                  <motion.div
-                    className="h-full bg-accent rounded-full"
-                    animate={{ width: `${analysisPct}%` }}
-                    transition={{ duration: 0.4, ease: "easeOut" }}
-                  />
-                </div>
-
-                <div className="mt-8 flex flex-wrap gap-2 justify-center">
-                  {DIAGNOSTIC_TOPICS.map((topic, i) => (
-                    <motion.span
-                      key={topic.id}
-                      animate={{
-                        opacity: i <= diagnosticStep ? 1 : 0.35,
-                        scale: i === diagnosticStep ? 1.1 : 1,
-                      }}
-                      transition={{ duration: 0.25 }}
-                      className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${
-                        i < diagnosticStep
-                          ? "bg-accent/10 border-accent/30 text-accent"
-                          : i === diagnosticStep
-                            ? "bg-accent/15 border-accent/40 text-accent font-medium"
-                            : "bg-card border-border text-muted"
-                      }`}
-                    >
-                      {topic.icon} {topic.label}
-                    </motion.span>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+          <DiagnosticWorkspace
+            diagnostic={diagnostic}
+            onComplete={handleDiagnosticComplete}
+          />
+        </div>
       </PageContainer>
     );
   }
 
   const sortedTopics = [...diagnostic.topicScores].sort(
-    (a, b) => a.score / a.maxScore - b.score / b.maxScore
+    (left, right) => left.score / left.maxScore - right.score / right.maxScore
   );
-  const weakestTopics = sortedTopics.slice(0, 3);
-  const strongestTopics = sortedTopics.slice(-2).reverse();
+  const weakestTopics = getWeakestTopics(diagnostic, 3);
+  const structuredReports = diagnostic.topicDiagnostics ?? [];
+  const structuredTopicIds = new Set(
+    structuredReports.map((report) => report.topicId)
+  );
+  const selectedTopicId =
+    (focusedTopicId &&
+    structuredReports.some((report) => report.topicId === focusedTopicId)
+      ? focusedTopicId
+      : diagnostic.latestTopicId) ??
+    structuredReports[0]?.topicId ??
+    null;
+  const activeReport =
+    structuredReports.find((report) => report.topicId === selectedTopicId) ??
+    structuredReports[0] ??
+    null;
+  const activeTopicInfo = activeReport ? getTopicById(activeReport.topicId) : null;
+  const coveredCount =
+    activeReport?.curriculumPoints.filter((point) => point.status === "covered")
+      .length ?? 0;
+  const partialCount =
+    activeReport?.curriculumPoints.filter((point) => point.status === "partial")
+      .length ?? 0;
+  const misconceptionCount =
+    activeReport?.curriculumPoints.filter(
+      (point) => point.status === "misconception"
+    ).length ?? 0;
+  const unassessedCount =
+    activeReport?.curriculumPoints.filter((point) => point.status === "unassessed")
+      .length ?? 0;
+  const recentActivity = activityHistory.slice(0, 4);
+  const structuredRecommendations = getRecommendedMaterialCards(
+    activeReport
+      ? [activeReport.topicId, ...weakestTopics.map((topic) => topic.category)]
+      : weakestTopics.map((topic) => topic.category),
+    6
+  );
+  const recommendedMaterials = activeReport?.recommendedMaterialIds?.length
+    ? structuredRecommendations.filter((material) =>
+        activeReport.recommendedMaterialIds.includes(material.id)
+      )
+    : structuredRecommendations.slice(0, 3);
+  const displayMaterials = hydrateMaterialsWithProgress(
+    recommendedMaterials.length > 0
+      ? recommendedMaterials
+      : structuredRecommendations.slice(0, 3),
+    revisionProgress
+  );
 
-  const recommendedMaterials = MOCK_MATERIALS.filter((m) => {
-    const weakNames = weakestTopics.map((t) => t.topic.toLowerCase());
-    return weakNames.some(
-      (name) =>
-        m.topic.toLowerCase().includes(name.split(" ")[0]) ||
-        name.includes(m.topic.toLowerCase().split(" ")[0])
-    );
-  }).slice(0, 3);
+  async function handleMaterialProgress(materialId: string) {
+    const material = displayMaterials.find((entry) => entry.id === materialId);
 
-  const displayMaterials = recommendedMaterials.length > 0 ? recommendedMaterials : MOCK_MATERIALS.slice(0, 3);
+    if (!material) {
+      return;
+    }
+
+    const topicId = resolveMaterialTopicId(material);
+
+    if (!topicId) {
+      setPageError("Unable to match this material to a topic.");
+      return;
+    }
+
+    try {
+      setPageError("");
+      await trackMaterialProgress({
+        materialId: material.id,
+        title: material.title,
+        topicId,
+        activityType: material.type,
+        currentProgressPercent: material.progress ?? 0,
+        estimatedMinutes: material.estimatedMinutes,
+      });
+    } catch (error) {
+      setPageError(
+        error instanceof Error
+          ? error.message
+          : "Unable to update revision progress."
+      );
+    }
+  }
 
   return (
-    <PageContainer>
+    <PageContainer size="lg">
       <motion.div initial="hidden" animate="visible" className="space-y-6">
+        {pageError && (
+          <div className="flex items-center gap-2 rounded-2xl border border-danger/20 bg-danger/10 px-4 py-3 text-sm text-danger">
+            <AlertCircle size={14} className="shrink-0" />
+            {pageError}
+          </div>
+        )}
 
-        {/* ─── Diagnostic Complete Banner ─── */}
-        <AnimatePresence>
-          {justCompleted && (
-            <motion.div
-              initial={{ opacity: 0, y: -12, height: 0 }}
-              animate={{ opacity: 1, y: 0, height: "auto" }}
-              exit={{ opacity: 0, y: -8, height: 0 }}
-              transition={{ type: "spring", stiffness: 400, damping: 36 }}
-              className="overflow-hidden"
-            >
-              <div className="flex items-center gap-3 p-3.5 bg-success/8 border border-success/20 rounded-xl">
-                <div className="w-8 h-8 rounded-lg bg-success/15 flex items-center justify-center shrink-0">
-                  <CheckCircle size={16} className="text-success" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-foreground">Diagnostic Complete</p>
-                  <p className="text-xs text-muted-foreground">Your personalised revision plan is ready. Focus on red areas first for the biggest gains.</p>
-                </div>
+        {justCompleted && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-2xl border border-success/20 bg-success/10 px-4 py-3"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-success/15">
+                <CheckCircle2 size={16} className="text-success" />
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  Adaptive diagnostic updated
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  The topic coverage map and next revision targets are ready.
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
 
-        {/* ─── Header ─── */}
-        <motion.div variants={fadeUp} custom={0} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <h1 className="text-2xl sm:text-3xl font-bold">Your Revision Plan</h1>
-          <Button variant="ghost" size="sm" onClick={handleResetDiagnostic}>
-            <RotateCcw size={14} /> Reset
-          </Button>
+        <motion.div
+          variants={fadeUp}
+          custom={0}
+          className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Revision diagnostic
+            </p>
+            <h1 className="mt-1 text-2xl font-bold text-foreground sm:text-3xl">
+              Topic-first diagnostic coverage
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm text-muted">
+              Freeform input, curriculum-point matching, targeted follow-ups, and
+              coverage mapped back into the revision system.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setIsRetaking(true)}>
+              <RotateCcw size={14} />
+              Diagnose another topic
+            </Button>
+            {activeReport && (
+              <Link
+                href={`/revision/${activeReport.topicId}`}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-accent-soft"
+              >
+                Open topic workspace
+                <ArrowRight size={14} />
+              </Link>
+            )}
+          </div>
         </motion.div>
 
-        {/* ─── Main block: topic list (left, shifted right) + Prioritise these (right) ─── */}
-        <motion.div variants={fadeUp} custom={1} className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6 lg:gap-8">
-          {/* All topics — vertical list, clear click affordance */}
-          <div className="lg:pl-8 min-w-0">
-            <div className="flex items-center justify-between gap-3 mb-3">
+        <motion.div variants={fadeUp} custom={1} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <Card className="p-5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Overall score
+            </p>
+            <p className="mt-3 text-3xl font-bold tabular-nums text-foreground">
+              {diagnostic.overallScore}%
+            </p>
+            <p className="mt-2 text-xs text-muted">
+              Across all scored topics in the latest revision diagnostic snapshot.
+            </p>
+          </Card>
+
+          <Card className="p-5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Topics scored
+            </p>
+            <p className="mt-3 text-3xl font-bold tabular-nums text-foreground">
+              {diagnostic.topicScores.length}
+            </p>
+            <p className="mt-2 text-xs text-muted">
+              Structured coverage is available for {structuredReports.length} topic
+              {structuredReports.length === 1 ? "" : "s"}.
+            </p>
+          </Card>
+
+          <Card className="p-5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Latest confidence
+            </p>
+            <p className="mt-3 text-3xl font-bold tabular-nums text-foreground">
+              {activeReport ? Math.round(activeReport.confidence * 100) : 0}%
+            </p>
+            <p className="mt-2 text-xs text-muted">
+              Confidence from freeform evidence, follow-up answers, and misconception checks.
+            </p>
+          </Card>
+
+          <Card className="p-5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Next targets
+            </p>
+            <p className="mt-3 text-3xl font-bold tabular-nums text-foreground">
+              {activeReport?.suggestedNextTargets.length ?? weakestTopics.length}
+            </p>
+            <p className="mt-2 text-xs text-muted">
+              Immediate revision priorities surfaced by the diagnostic engine.
+            </p>
+          </Card>
+        </motion.div>
+
+        <motion.div
+          variants={fadeUp}
+          custom={2}
+          className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]"
+        >
+          <Card className="p-5 sm:p-6">
+            <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <Target size={18} className="text-accent shrink-0" />
-                <h2 className="font-semibold text-base">All Topic Scores</h2>
+                <BrainCircuit size={15} className="text-accent" />
+                <h2 className="text-sm font-semibold text-foreground">
+                  Topic coverage index
+                </h2>
               </div>
-              <p className="text-xs text-muted-foreground">Tap or click to open</p>
+              <span className="text-xs text-muted-foreground">
+                Structured topics can be opened below
+              </span>
             </div>
-            <div className="space-y-2">
-              {sortedTopics.map((topic, i) => {
+            <div className="mt-4 space-y-2">
+              {sortedTopics.map((topic) => {
                 const pct = Math.round((topic.score / topic.maxScore) * 100);
-                const topicData = TOPICS.find((t) => t.id === topic.category);
-                const isWeak = pct < 50;
-                const isStrong = pct >= 75;
+                const topicInfo = getTopicById(topic.category);
+                const hasStructuredCoverage = structuredTopicIds.has(topic.category);
+                const isActive = activeReport?.topicId === topic.category;
+
                 return (
-                  <Link key={topic.topic} href={`/revision/${topic.category}`} className="block cursor-pointer">
-                    <motion.div
-                      initial={{ opacity: 0, x: -8 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ type: "spring", stiffness: 380, damping: 32, delay: 0.02 + i * 0.03 }}
-                      whileHover={{ x: 4, transition: { duration: 0.2 } }}
-                      whileTap={{ scale: 0.99 }}
-                      className={`group flex items-center gap-4 rounded-xl border px-4 py-3.5 transition-all duration-200 ${
-                        isWeak
-                          ? "bg-danger/5 border-danger/20 hover:bg-danger/10 hover:border-danger/30 hover:shadow-[0_0_0_1px_rgba(239,68,68,0.15)]"
-                          : isStrong
-                            ? "bg-success/5 border-success/20 hover:bg-success/10 hover:border-success/30 hover:shadow-[0_0_0_1px_rgba(34,197,94,0.15)]"
-                            : "bg-card/60 border-border hover:bg-accent/5 hover:border-accent/25 hover:shadow-[0_0_0_1px_rgba(139,92,246,0.12)]"
-                      }`}
-                    >
-                      <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-lg transition-colors ${
-                        isWeak ? "bg-danger/10" : isStrong ? "bg-success/10" : "bg-surface"
-                      }`}>
-                        {topicData?.icon ?? "\u2014"}
+                  <button
+                    key={topic.category}
+                    type="button"
+                    onClick={() =>
+                      hasStructuredCoverage
+                        ? setFocusedTopicId(topic.category)
+                        : undefined
+                    }
+                    className={`w-full rounded-2xl border px-4 py-3 text-left transition-colors ${
+                      isActive
+                        ? "border-accent/30 bg-accent/10"
+                        : "border-border bg-surface/30 hover:border-accent/20 hover:bg-card"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card text-lg">
+                        {topicInfo?.icon ?? "-"}
                       </span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-foreground truncate group-hover:text-foreground">{topic.topic}</p>
-                        <ProgressBar value={pct} size="sm" className="mt-2 max-w-[140px]" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="truncate text-sm font-semibold text-foreground">
+                            {topic.topic}
+                          </p>
+                          <Badge variant={hasStructuredCoverage ? "success" : "warning"}>
+                            {hasStructuredCoverage ? "Structured" : "Score only"}
+                          </Badge>
+                        </div>
+                        <div className="mt-2 flex items-center gap-3">
+                          <ProgressBar value={pct} size="sm" className="max-w-[180px]" />
+                          <span className="text-xs font-medium tabular-nums text-muted-foreground">
+                            {pct}%
+                          </span>
+                        </div>
                       </div>
-                      <span className={`text-sm font-bold tabular-nums shrink-0 ${isWeak ? "text-danger" : isStrong ? "text-success" : "text-warning"}`}>
-                        {pct}%
-                      </span>
-                      <span className="flex items-center gap-1.5 shrink-0 text-xs font-medium text-accent opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all">
-                        Open
-                        <ChevronRight size={16} className="inline" />
-                      </span>
-                    </motion.div>
-                  </Link>
+                      <ChevronRight
+                        size={16}
+                        className={hasStructuredCoverage ? "text-accent" : "text-muted-foreground"}
+                      />
+                    </div>
+                  </button>
                 );
               })}
             </div>
-          </div>
+          </Card>
 
-          {/* Right column: Prioritise these + Looking strong */}
-          <div className="lg:order-none flex flex-col gap-4">
-            <Card className="border-danger/20 bg-danger/5">
-              <div className="flex items-center gap-2 mb-4">
-                <TrendingUp size={16} className="text-danger shrink-0" />
-                <h3 className="font-semibold text-sm">Prioritise these</h3>
-              </div>
-              <div className="space-y-2">
-                {weakestTopics.map((topic, i) => {
-                  const pct = Math.round((topic.score / topic.maxScore) * 100);
-                  return (
-                    <Link key={topic.topic} href={`/revision/${topic.category}`}>
-                      <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-card border border-border hover:bg-danger/5 hover:border-danger/20 transition-colors cursor-pointer">
-                        <span className="w-6 h-6 rounded-md bg-danger/15 text-danger text-xs font-bold flex items-center justify-center shrink-0">{i + 1}</span>
-                        <span className="text-sm font-medium truncate flex-1 min-w-0">{topic.topic}</span>
-                        <span className="text-xs font-bold text-danger tabular-nums shrink-0">{pct}%</span>
+          <Card className="p-5 sm:p-6">
+            {activeReport && activeTopicInfo ? (
+              <div className="space-y-5">
+                <div className="flex items-start gap-3">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-accent/20 bg-accent/10 text-2xl">
+                    {activeTopicInfo.icon}
+                  </span>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      Active report
+                    </p>
+                    <h2 className="text-xl font-semibold text-foreground">
+                      {activeReport.topicLabel}
+                    </h2>
+                    <p className="mt-1 text-sm text-muted">
+                      Latest mapped topic with pinned coverage and adaptive follow-up history.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { label: "Covered", value: coveredCount, tone: "success" as const },
+                    { label: "Partial", value: partialCount, tone: "warning" as const },
+                    { label: "Unassessed", value: unassessedCount, tone: "default" as const },
+                    { label: "Misconceptions", value: misconceptionCount, tone: "danger" as const },
+                  ].map((item) => (
+                    <div
+                      key={item.label}
+                      className="rounded-2xl border border-border bg-surface/30 px-4 py-3"
+                    >
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                        {item.label}
+                      </p>
+                      <div className="mt-2 flex items-center gap-2">
+                        <span className="text-2xl font-bold tabular-nums text-foreground">
+                          {item.value}
+                        </span>
+                        <Badge variant={item.tone}>{item.label}</Badge>
                       </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            </Card>
-            <Card className="border-success/20 bg-success/5 sticky top-24">
-              <div className="flex items-center gap-2 mb-3">
-                <TrendingUp size={16} className="text-success shrink-0" />
-                <h3 className="font-semibold text-sm">Looking strong</h3>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {strongestTopics.map((topic) => {
-                  const pct = Math.round((topic.score / topic.maxScore) * 100);
-                  return (
-                    <Link key={topic.topic} href={`/revision/${topic.category}`}>
-                      <span className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-card border border-border hover:bg-success/5 hover:border-success/20 transition-colors text-sm font-medium">
-                        <span className="w-5 h-5 rounded-md bg-success/15 text-success text-[10px] font-bold flex items-center justify-center">{"\u2713"}</span>
-                        <span className="text-foreground">{topic.topic}</span>
-                        <span className="text-success text-xs font-bold tabular-nums">{pct}%</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    Suggested next revision targets
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {activeReport.suggestedNextTargets.length > 0 ? (
+                      activeReport.suggestedNextTargets.map((target) => (
+                        <span
+                          key={target}
+                          className="rounded-xl border border-border bg-surface/40 px-3 py-2 text-xs text-foreground"
+                        >
+                          {target}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        No urgent revision targets remain for this topic.
                       </span>
-                    </Link>
-                  );
-                })}
+                    )}
+                  </div>
+                </div>
+
+                {diagnostic.unassessedTopicIds && diagnostic.unassessedTopicIds.length > 0 && (
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Course topics not yet scored
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {diagnostic.unassessedTopicIds.map((topicId) => (
+                        <span
+                          key={topicId}
+                          className="rounded-xl border border-border bg-surface/30 px-3 py-2 text-xs text-muted-foreground"
+                        >
+                          {getTopicById(topicId)?.label ?? topicId}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            </Card>
-          </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Sparkles size={15} className="text-warning" />
+                  <h2 className="text-sm font-semibold text-foreground">
+                    Legacy diagnostic detected
+                  </h2>
+                </div>
+                <p className="text-sm leading-relaxed text-muted">
+                  This account still has score-only diagnostic data from the old
+                  linear flow. Run a new topic diagnostic to unlock curriculum-point
+                  coverage, adaptive follow-ups, and structured next targets.
+                </p>
+                <Button onClick={() => setIsRetaking(true)}>
+                  Start new topic diagnostic
+                  <ArrowRight size={14} />
+                </Button>
+              </div>
+            )}
+          </Card>
         </motion.div>
 
-        {/* ─── Recommended materials ─── */}
-        <motion.div variants={fadeUp} custom={2}>
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Star size={16} className="text-accent" />
-              <h3 className="font-semibold text-sm">Recommended Next</h3>
+        {activeReport && (
+          <motion.div
+            variants={fadeUp}
+            custom={3}
+            className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px]"
+          >
+            <Card className="p-5 sm:p-6">
+              <div className="flex items-center gap-2">
+                <Target size={15} className="text-accent" />
+                <h2 className="text-sm font-semibold text-foreground">
+                  Curriculum point coverage
+                </h2>
+              </div>
+              <div className="mt-5 space-y-3">
+                {activeReport.curriculumPoints.map((point) => (
+                  <div
+                    key={point.pointId}
+                    className="rounded-2xl border border-border bg-surface/20 px-4 py-4"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-mono text-xs text-accent">
+                            {point.pointId}
+                          </span>
+                          <p className="text-sm font-semibold text-foreground">
+                            {point.label}
+                          </p>
+                          <Badge variant={getPointVariant(point.status)}>
+                            {getPointLabel(point.status)}
+                          </Badge>
+                        </div>
+                        {point.notes && (
+                          <p className="mt-2 text-xs leading-relaxed text-muted">
+                            {point.notes}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="min-w-[180px] space-y-2">
+                        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                          <span>Confidence</span>
+                          <span>{Math.round(point.confidence * 100)}%</span>
+                        </div>
+                        <ProgressBar value={Math.round(point.confidence * 100)} size="sm" />
+                      </div>
+                    </div>
+
+                    <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                          Matched terms
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {point.matchedTerms.length > 0 ? (
+                            point.matchedTerms.map((term) => (
+                              <span
+                                key={`${point.pointId}-${term}`}
+                                className="rounded-lg bg-success/10 px-2.5 py-1 text-[11px] text-success"
+                              >
+                                {term}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-xs text-muted-foreground">
+                              No clear matched terms.
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                          Missing terms
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {point.missingTerms.length > 0 ? (
+                            point.missingTerms.map((term) => (
+                              <span
+                                key={`${point.pointId}-missing-${term}`}
+                                className="rounded-lg bg-warning/10 px-2.5 py-1 text-[11px] text-warning"
+                              >
+                                {term}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-xs text-muted-foreground">
+                              No major missing signals.
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            <div className="space-y-4">
+              <Card className="p-5">
+                <div className="flex items-center gap-2">
+                  <Sparkles size={14} className="text-success" />
+                  <h2 className="text-sm font-semibold text-foreground">
+                    Key terms detected
+                  </h2>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {activeReport.keyTermsMatched.length > 0 ? (
+                    activeReport.keyTermsMatched.map((term) => (
+                      <span
+                        key={term}
+                        className="rounded-lg bg-success/10 px-2.5 py-1 text-[11px] text-success"
+                      >
+                        {term}
+                      </span>
+                    ))
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      No clear topic language was matched yet.
+                    </p>
+                  )}
+                </div>
+              </Card>
+
+              <Card className="p-5">
+                <div className="flex items-center gap-2">
+                  <AlertCircle size={14} className="text-danger" />
+                  <h2 className="text-sm font-semibold text-foreground">
+                    Adaptive follow-up trail
+                  </h2>
+                </div>
+                <div className="mt-4 space-y-3">
+                  {activeReport.followUps.length > 0 ? (
+                    activeReport.followUps.map((followUp) => (
+                      <div
+                        key={followUp.id}
+                        className="rounded-2xl border border-border bg-surface/30 px-3 py-3"
+                      >
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                          {followUp.targetedPointId} - {followUp.reason}
+                        </p>
+                        <p className="mt-1 text-sm font-medium text-foreground">
+                          {followUp.question}
+                        </p>
+                        <p className="mt-2 text-xs leading-relaxed text-muted">
+                          {followUp.answer}
+                        </p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      No follow-ups were needed for this topic run.
+                    </p>
+                  )}
+                </div>
+              </Card>
             </div>
-            <span className="text-xs text-muted-foreground">Based on your weakest areas</span>
+          </motion.div>
+        )}
+
+        <motion.div variants={fadeUp} custom={4}>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <TrendingUp size={15} className="text-accent" />
+              <h2 className="text-sm font-semibold text-foreground">
+                Recommended next materials
+              </h2>
+            </div>
+            <span className="text-xs text-muted-foreground">
+              Filtered from current diagnostic targets
+            </span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {displayMaterials.map((material, i) => (
-              <MaterialCard key={material.id} data={material} index={i} />
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {displayMaterials.map((material, index) => (
+              <MaterialCard
+                key={material.id}
+                data={material}
+                index={index}
+                onClick={() => void handleMaterialProgress(material.id)}
+              />
             ))}
           </div>
         </motion.div>
 
-        {/* ─── Recent activity + performance ─── */}
-        <motion.div variants={fadeUp} custom={3} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Card>
-            <div className="flex items-center gap-2 mb-3">
-              <Clock size={16} className="text-muted-foreground" />
-              <h3 className="font-semibold text-sm">Recent Activity</h3>
+        <motion.div variants={fadeUp} custom={5} className="grid gap-4 xl:grid-cols-2">
+          <Card className="p-5">
+            <div className="flex items-center gap-2">
+              <Clock size={15} className="text-muted-foreground" />
+              <h2 className="text-sm font-semibold text-foreground">
+                Recent activity
+              </h2>
             </div>
-            <div className="space-y-1">
-              {MOCK_RECENT_ACTIVITY.slice(0, 4).map((item, i) => (
-                <div key={i} className="flex items-center gap-3 p-2 rounded-xl hover:bg-surface transition-colors">
-                  <div className="w-7 h-7 rounded-lg bg-surface flex items-center justify-center shrink-0">
-                    <BookOpen size={12} className="text-muted-foreground" />
+            <div className="mt-4 space-y-2">
+              {recentActivity.length > 0 ? (
+                recentActivity.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface/30 px-3 py-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm text-foreground">{item.title}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {formatRelativeTime(item.occurredAt)}
+                      </p>
+                    </div>
+                    <Badge variant="default">{item.minutesSpent}m</Badge>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-foreground truncate">{item.label}</p>
-                    <p className="text-[10px] text-muted-foreground">{item.time}</p>
-                  </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-sm text-muted">No recent activity yet.</p>
+              )}
             </div>
           </Card>
-          <Card className="relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-transparent" />
-            <div className="relative z-10">
-              <div className="flex items-center gap-2 mb-3">
-                <Play size={14} className="text-accent" />
-                <h3 className="font-semibold text-sm">Recent Performance</h3>
-              </div>
-              <div className="space-y-2.5">
-                {[
-                  { label: "Last session score", value: "72%", variant: "warning" as const },
-                  { label: "Questions answered", value: "18", variant: "default" as const },
-                  { label: "Time spent", value: "24 min", variant: "default" as const },
-                ].map((stat) => (
-                  <div key={stat.label} className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">{stat.label}</span>
-                    <Badge variant={stat.variant}>{stat.value}</Badge>
+
+          <Card className="p-5">
+            <div className="flex items-center gap-2">
+              <Target size={15} className="text-warning" />
+              <h2 className="text-sm font-semibold text-foreground">
+                Weakest scored topics
+              </h2>
+            </div>
+            <div className="mt-4 space-y-3">
+              {weakestTopics.map((topic) => {
+                const pct = Math.round((topic.score / topic.maxScore) * 100);
+                return (
+                  <div key={topic.category} className="space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm font-medium text-foreground">
+                        {topic.topic}
+                      </span>
+                      <Badge variant={getScoreVariant(pct)}>{pct}%</Badge>
+                    </div>
+                    <ProgressBar value={pct} size="sm" />
                   </div>
-                ))}
-              </div>
+                );
+              })}
             </div>
           </Card>
         </motion.div>
-
       </motion.div>
     </PageContainer>
   );

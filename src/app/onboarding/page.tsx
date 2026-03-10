@@ -1,16 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowRight, CheckCircle } from "lucide-react";
+import { AlertCircle, ArrowRight, CheckCircle } from "lucide-react";
+import { useAppData } from "@/components/providers/app-data-provider";
 import { Button, Chip } from "@/components/ui";
 import { TOPICS } from "@/lib/types";
-import { storage } from "@/lib/storage";
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const { onboarding, saveWeakAreas } = useAppData();
   const [selected, setSelected] = useState<string[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (onboarding?.weakAreas?.length) {
+      setSelected(onboarding.weakAreas);
+    }
+  }, [onboarding]);
 
   function toggle(id: string) {
     setSelected((prev) =>
@@ -18,16 +27,25 @@ export default function OnboardingPage() {
     );
   }
 
-  function handleContinue() {
+  async function handleContinue() {
     if (selected.length === 0) return;
 
-    // Save weak areas (completedAt will be set after focus breakdown)
-    storage.setOnboarding({
-      weakAreas: selected,
-      completedAt: "",
-    });
+    setError("");
+    setIsSaving(true);
 
-    router.push("/onboarding/focus");
+    try {
+      await saveWeakAreas(selected);
+      router.push("/onboarding/focus");
+      router.refresh();
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to save your weak areas."
+      );
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (
@@ -102,8 +120,9 @@ export default function OnboardingPage() {
           <Button
             size="lg"
             onClick={handleContinue}
-            disabled={selected.length === 0}
+            disabled={selected.length === 0 || isSaving}
             className="group"
+            isLoading={isSaving}
           >
             Continue
             <ArrowRight size={18} className="transition-transform group-hover:translate-x-0.5" />
@@ -113,6 +132,12 @@ export default function OnboardingPage() {
               ? "Select at least one topic"
               : `${selected.length} topic${selected.length > 1 ? "s" : ""} selected`}
           </p>
+          {error && (
+            <div className="flex items-center gap-2 text-sm text-danger bg-danger/10 rounded-lg px-3 py-2.5">
+              <AlertCircle size={14} className="shrink-0" />
+              {error}
+            </div>
+          )}
         </div>
       </motion.div>
     </div>

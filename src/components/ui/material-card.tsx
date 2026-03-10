@@ -11,6 +11,7 @@ export interface MaterialCardData {
   title: string;
   description?: string;
   topic: string;
+  topicId?: string;
   topicIcon?: string;
   type: "notes" | "practice" | "review" | "guide" | "video" | "flashcards";
   difficulty?: "easy" | "medium" | "hard";
@@ -39,11 +40,24 @@ interface MaterialCardProps {
   data: MaterialCardData;
   index?: number;
   className?: string;
+  onClick?: () => void;
 }
 
-export function MaterialCard({ data, index = 0, className }: MaterialCardProps) {
+export function MaterialCard({
+  data,
+  index = 0,
+  className,
+  onClick,
+}: MaterialCardProps) {
   const typeInfo = typeConfig[data.type];
   const TypeIcon = typeInfo.icon;
+  const ctaLabel =
+    data.cta ??
+    (typeof data.progress === "number" && data.progress >= 100
+      ? "Review again"
+      : data.progress
+        ? "Continue"
+        : "Start");
 
   return (
     <motion.div
@@ -54,10 +68,23 @@ export function MaterialCard({ data, index = 0, className }: MaterialCardProps) 
         boxShadow: "0 0 0 1px rgba(139, 92, 246, 0.05), 0 2px 10px -3px rgba(139, 92, 246, 0.08), 0 0 16px -6px rgba(139, 92, 246, 0.05)",
       }}
       transition={{ delay: index * 0.05, duration: 0.3 }}
+      onClick={onClick}
+      onKeyDown={(event) => {
+        if (!onClick) {
+          return;
+        }
+
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onClick();
+        }
+      }}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
       className={cn(
         "group bg-card border border-border rounded-2xl overflow-hidden",
         "hover:border-border-light hover:bg-card-hover transition-colors duration-300",
-        "cursor-pointer",
+        onClick ? "cursor-pointer" : "cursor-default",
         className
       )}
     >
@@ -128,7 +155,7 @@ export function MaterialCard({ data, index = 0, className }: MaterialCardProps) 
 
         {/* CTA */}
         <div className="flex items-center gap-1 text-xs text-accent font-medium pt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-          {data.cta || (data.progress ? "Continue" : "Start")}
+          {ctaLabel}
           <ArrowRight size={12} className="transition-transform group-hover:translate-x-0.5" />
         </div>
       </div>

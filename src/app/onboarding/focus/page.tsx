@@ -3,35 +3,39 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowRight, ArrowLeft, CheckCircle, Layers } from "lucide-react";
+import { AlertCircle, ArrowRight, ArrowLeft, CheckCircle, Layers } from "lucide-react";
+import { useAppData } from "@/components/providers/app-data-provider";
 import { Button } from "@/components/ui";
 import { TopicAccordion } from "@/components/onboarding/topic-accordion";
 import { SmartInputPanel } from "@/components/onboarding/smart-input-panel";
-import { storage } from "@/lib/storage";
 import { TOPICS, getTopicTree, getTopicById } from "@/lib/types";
 import type { TopicTree } from "@/lib/types";
 
 export default function FocusBreakdownPage() {
   const router = useRouter();
+  const { onboarding, saveFocusBreakdown } = useAppData();
 
   const [weakAreas, setWeakAreas] = useState<string[]>([]);
   const [openTopicId, setOpenTopicId] = useState<string | null>(null);
   const [selectedSubtopics, setSelectedSubtopics] = useState<Record<string, string[]>>({});
   const [freeTextNotes, setFreeTextNotes] = useState<Record<string, string>>({});
   const [globalFreeText, setGlobalFreeText] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    const onboarding = storage.getOnboarding();
     if (!onboarding) {
-      router.push("/onboarding");
       return;
     }
     setWeakAreas(onboarding.weakAreas);
+    setSelectedSubtopics(onboarding.focusBreakdown?.selectedSubtopics ?? {});
+    setFreeTextNotes(onboarding.focusBreakdown?.freeTextNotes ?? {});
+    setGlobalFreeText(onboarding.focusBreakdown?.globalNote ?? "");
     // Auto-open the first topic
     if (onboarding.weakAreas.length > 0) {
       setOpenTopicId(onboarding.weakAreas[0]);
     }
-  }, [router]);
+  }, [onboarding]);
 
   const handleAccordionToggle = useCallback((topicId: string) => {
     setOpenTopicId((prev) => (prev === topicId ? null : topicId));
@@ -74,28 +78,28 @@ export default function FocusBreakdownPage() {
     });
   }, []);
 
-  function handleContinue() {
-    const onboarding = storage.getOnboarding();
-    if (!onboarding) return;
+  async function handleContinue() {
+    setError("");
+    setIsSaving(true);
 
-    // Save with possibly expanded weakAreas from auto-detection
-    storage.setOnboarding({
-      ...onboarding,
-      weakAreas,
-      focusBreakdown: {
+    try {
+      await saveFocusBreakdown({
+        weakAreas,
         selectedSubtopics,
         freeTextNotes,
-        completedAt: new Date().toISOString(),
-      },
-      completedAt: new Date().toISOString(),
-    });
-    storage.setFocusBreakdown({
-      selectedSubtopics,
-      freeTextNotes,
-      completedAt: new Date().toISOString(),
-    });
-
-    router.push("/home");
+        globalNote: globalFreeText,
+      });
+      router.push("/home");
+      router.refresh();
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to save your focus breakdown."
+      );
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   function handleBack() {
@@ -236,12 +240,24 @@ export default function FocusBreakdownPage() {
                 ? `${totalSelected} subtopic${totalSelected > 1 ? "s" : ""} selected`
                 : "You can skip this or pick subtopics"}
             </p>
-            <Button size="lg" onClick={handleContinue} className="group">
+            <Button
+              size="lg"
+              onClick={handleContinue}
+              className="group"
+              disabled={isSaving}
+              isLoading={isSaving}
+            >
               Continue to Dashboard
               <ArrowRight size={18} className="transition-transform group-hover:translate-x-0.5" />
             </Button>
           </div>
         </motion.div>
+        {error && (
+          <div className="mt-4 flex items-center gap-2 text-sm text-danger bg-danger/10 rounded-lg px-3 py-2.5">
+            <AlertCircle size={14} className="shrink-0" />
+            {error}
+          </div>
+        )}
       </div>
     </div>
   );

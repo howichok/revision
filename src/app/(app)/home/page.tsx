@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
+  AlertCircle,
   BookOpen,
   Library,
   Target,
@@ -15,7 +16,10 @@ import {
   Star,
   MapPin,
   BarChart3,
+  ClipboardCheck,
+  Play,
 } from "lucide-react";
+import { useAppData } from "@/components/providers/app-data-provider";
 import {
   Button,
   Card,
@@ -26,15 +30,20 @@ import {
   MaterialCard,
 } from "@/components/ui";
 import { PageContainer } from "@/components/layout/page-container";
-import { storage } from "@/lib/storage";
+import { getRecommendedMaterialCards } from "@/lib/content";
 import {
   getTopicLabel,
   getTopicById,
-  MOCK_MATERIALS,
-  MOCK_WEEK_ACTIVITY,
-  MOCK_RECENT_ACTIVITY,
 } from "@/lib/types";
-import type { UserProfile, OnboardingData, DiagnosticResult } from "@/lib/types";
+import {
+  formatRelativeTime,
+  getStudiedTopicCount,
+  getThisWeekMinutes,
+  hydrateMaterialsWithProgress,
+  resolveMaterialTopicId,
+  getWeakestTopics,
+  getWeekActivity,
+} from "@/lib/progress";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 12 },
@@ -72,35 +81,95 @@ const activityTypeIcon = {
   practice: Target,
   notes: BookOpen,
   flashcards: Zap,
+  guide: Zap,
+  video: Play,
+  diagnostic: ClipboardCheck,
+  onboarding: Target,
 };
 
 export default function HomePage() {
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [onboarding, setOnboarding] = useState<OnboardingData | null>(null);
-  const [diagnostic, setDiagnostic] = useState<DiagnosticResult | null>(null);
+  const {
+    activityHistory,
+    diagnostic,
+    isHydrating,
+    onboarding,
+    revisionProgress,
+    trackMaterialProgress,
+    user,
+  } = useAppData();
+  const [pageError, setPageError] = useState("");
 
-  useEffect(() => {
-    setUser(storage.getUser());
-    setOnboarding(storage.getOnboarding());
-    setDiagnostic(storage.getDiagnostic());
-  }, []);
+  if (isHydrating && !user) {
+    return (
+      <PageContainer size="lg">
+        <div className="h-48" />
+      </PageContainer>
+    );
+  }
 
   if (!user) return null;
 
   const hasDiagnostic = !!diagnostic;
   const { greeting, tzLabel } = getLondonGreeting();
 
-  const weakestTopics = hasDiagnostic
-    ? [...diagnostic.topicScores]
-        .sort((a, b) => a.score / a.maxScore - b.score / b.maxScore)
-        .slice(0, 3)
-    : [];
+  const weakestTopics = getWeakestTopics(diagnostic, 3);
+  const weekActivity = getWeekActivity(activityHistory);
+  const totalSessions = activityHistory.length;
+  const minutesThisWeek = getThisWeekMinutes(activityHistory);
+  const hoursThisWeek =
+    minutesThisWeek > 0 ? `${(minutesThisWeek / 60).toFixed(1)}h` : "\u2014";
+  const topicsCovered = getStudiedTopicCount(diagnostic);
+  const recentActivity = activityHistory.slice(0, 4);
+  const recommendedMaterials = hydrateMaterialsWithProgress(
+    getRecommendedMaterialCards(
+      weakestTopics.map((topic) => topic.category),
+      3
+    ),
+    revisionProgress
+  );
 
-  const totalSessions = MOCK_WEEK_ACTIVITY.reduce((a, b) => a + b, 0);
+  async function handleMaterialProgress(materialId: string) {
+    const material = recommendedMaterials.find((entry) => entry.id === materialId);
+
+    if (!material) {
+      return;
+    }
+
+    const topicId = resolveMaterialTopicId(material);
+
+    if (!topicId) {
+      setPageError("Unable to match this material to a topic.");
+      return;
+    }
+
+    try {
+      setPageError("");
+      await trackMaterialProgress({
+        materialId: material.id,
+        title: material.title,
+        topicId,
+        activityType: material.type,
+        currentProgressPercent: material.progress ?? 0,
+        estimatedMinutes: material.estimatedMinutes,
+      });
+    } catch (error) {
+      setPageError(
+        error instanceof Error
+          ? error.message
+          : "Unable to update your revision progress."
+      );
+    }
+  }
 
   return (
     <PageContainer size="lg">
       <motion.div initial="hidden" animate="visible" className="space-y-6">
+        {pageError && (
+          <div className="flex items-center gap-2 text-sm text-danger bg-danger/10 rounded-lg px-3 py-2.5">
+            <AlertCircle size={14} className="shrink-0" />
+            {pageError}
+          </div>
+        )}
 
         {/* ─── Greeting bar with streak ─── */}
         <motion.div variants={fadeUp} custom={0}>
@@ -146,7 +215,9 @@ export default function HomePage() {
                 <Clock size={12} className="text-muted-foreground" />
                 <span className="text-[11px] text-muted-foreground font-medium tracking-wide uppercase">Study Time</span>
               </div>
-              <p className="text-2xl font-bold leading-none tabular-nums">{hasDiagnostic ? "2.4h" : "\u2014"}</p>
+              <p className="text-2xl font-bold leading-none tabular-nums">
+                {hasDiagnostic ? hoursThisWeek : "\u2014"}
+              </p>
               <p className="text-[11px] text-muted-foreground mt-1">this week</p>
             </div>
 
@@ -157,7 +228,9 @@ export default function HomePage() {
                 <span className="text-[11px] text-muted-foreground font-medium tracking-wide uppercase">Topics</span>
               </div>
               <div className="flex items-baseline gap-1">
-                <p className="text-2xl font-bold leading-none tabular-nums">{hasDiagnostic ? "5" : "\u2014"}</p>
+                <p className="text-2xl font-bold leading-none tabular-nums">
+                  {hasDiagnostic ? topicsCovered : "\u2014"}
+                </p>
                 {hasDiagnostic && <span className="text-sm text-muted-foreground font-medium">/ 8</span>}
               </div>
               <p className="text-[11px] text-muted-foreground mt-1">covered</p>
@@ -173,7 +246,7 @@ export default function HomePage() {
                 <span className="text-[11px] text-muted-foreground tabular-nums">{totalSessions} sessions</span>
               </div>
               <div className="overflow-hidden">
-                <WeekActivity data={MOCK_WEEK_ACTIVITY} className="h-9" />
+                <WeekActivity data={weekActivity} className="h-9" />
               </div>
             </div>
           </div>
@@ -258,8 +331,13 @@ export default function HomePage() {
               </Link>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {MOCK_MATERIALS.slice(0, 3).map((material, i) => (
-                <MaterialCard key={material.id} data={material} index={i} />
+              {recommendedMaterials.map((material, i) => (
+                <MaterialCard
+                  key={material.id}
+                  data={material}
+                  index={i}
+                  onClick={() => void handleMaterialProgress(material.id)}
+                />
               ))}
             </div>
           </motion.div>
@@ -274,16 +352,16 @@ export default function HomePage() {
                 <h3 className="text-sm font-semibold">Recent Activity</h3>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-1">
-                {MOCK_RECENT_ACTIVITY.map((item, i) => {
+                {recentActivity.map((item) => {
                   const Icon = activityTypeIcon[item.type as keyof typeof activityTypeIcon] || BookOpen;
                   return (
-                    <div key={i} className="flex items-center gap-3 p-2 rounded-xl hover:bg-surface transition-colors">
+                    <div key={item.id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-surface transition-colors">
                       <div className="w-7 h-7 rounded-lg bg-surface flex items-center justify-center shrink-0">
                         <Icon size={13} className="text-muted-foreground" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs text-foreground truncate">{item.label}</p>
-                        <p className="text-[10px] text-muted-foreground">{item.time}</p>
+                        <p className="text-xs text-foreground truncate">{item.title}</p>
+                        <p className="text-[10px] text-muted-foreground">{formatRelativeTime(item.occurredAt)}</p>
                       </div>
                     </div>
                   );

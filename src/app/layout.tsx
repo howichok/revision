@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { AppDataProvider } from "@/components/providers/app-data-provider";
+import { loadAppState } from "@/lib/app-data";
+import { getSupabaseConfig } from "@/lib/supabase/config";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 import "./globals.css";
 
 const inter = Inter({
@@ -13,11 +17,28 @@ export const metadata: Metadata = {
     "A focused, modern revision platform that adapts to your weak areas and helps you study smarter.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  let initialState = null;
+
+  if (getSupabaseConfig()) {
+    try {
+      const supabase = await createServerSupabaseClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user) {
+        initialState = await loadAppState(supabase, user);
+      }
+    } catch {
+      initialState = null;
+    }
+  }
+
   return (
     <html lang="en" className="dark">
       <body className={`${inter.variable} antialiased relative`}>
@@ -32,7 +53,9 @@ export default function RootLayout({
             style={{ background: "radial-gradient(circle, rgba(139, 92, 246, 0.3) 0%, transparent 70%)" }}
           />
         </div>
-        <div className="relative z-10">{children}</div>
+        <div className="relative z-10">
+          <AppDataProvider initialState={initialState}>{children}</AppDataProvider>
+        </div>
       </body>
     </html>
   );

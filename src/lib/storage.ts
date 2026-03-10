@@ -1,55 +1,54 @@
 "use client";
 
-import type { UserProfile, OnboardingData, DiagnosticResult, AppState, FocusBreakdownData } from "./types";
+import type {
+  DiagnosticResult,
+  FocusBreakdownData,
+  OnboardingData,
+  UserProfile,
+} from "./types";
 
-const KEYS = {
+const LEGACY_KEYS = {
   user: "kosti_user",
   onboarding: "kosti_onboarding",
   diagnostic: "kosti_diagnostic",
   focusBreakdown: "kosti_focus_breakdown",
 } as const;
 
-function getItem<T>(key: string): T | null {
-  if (typeof window === "undefined") return null;
+type LegacySnapshot = {
+  user: UserProfile | null;
+  onboarding: OnboardingData | null;
+  focusBreakdown: FocusBreakdownData | null;
+  diagnostic: DiagnosticResult | null;
+};
+
+function readLegacyItem<T>(key: string): T | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
   try {
-    const raw = localStorage.getItem(key);
+    const raw = window.localStorage.getItem(key);
     return raw ? (JSON.parse(raw) as T) : null;
   } catch {
     return null;
   }
 }
 
-function setItem<T>(key: string, value: T): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(key, JSON.stringify(value));
+export function getLegacySnapshot(): LegacySnapshot {
+  return {
+    user: readLegacyItem<UserProfile>(LEGACY_KEYS.user),
+    onboarding: readLegacyItem<OnboardingData>(LEGACY_KEYS.onboarding),
+    focusBreakdown: readLegacyItem<FocusBreakdownData>(LEGACY_KEYS.focusBreakdown),
+    diagnostic: readLegacyItem<DiagnosticResult>(LEGACY_KEYS.diagnostic),
+  };
 }
 
-function removeItem(key: string): void {
-  if (typeof window === "undefined") return;
-  localStorage.removeItem(key);
+export function clearLegacySnapshot() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  Object.values(LEGACY_KEYS).forEach((key) => {
+    window.localStorage.removeItem(key);
+  });
 }
-
-export const storage = {
-  getUser: () => getItem<UserProfile>(KEYS.user),
-  setUser: (user: UserProfile) => setItem(KEYS.user, user),
-  removeUser: () => removeItem(KEYS.user),
-
-  getOnboarding: () => getItem<OnboardingData>(KEYS.onboarding),
-  setOnboarding: (data: OnboardingData) => setItem(KEYS.onboarding, data),
-
-  getFocusBreakdown: () => getItem<FocusBreakdownData>(KEYS.focusBreakdown),
-  setFocusBreakdown: (data: FocusBreakdownData) => setItem(KEYS.focusBreakdown, data),
-
-  getDiagnostic: () => getItem<DiagnosticResult>(KEYS.diagnostic),
-  setDiagnostic: (data: DiagnosticResult) => setItem(KEYS.diagnostic, data),
-
-  getAppState: (): AppState => ({
-    user: getItem<UserProfile>(KEYS.user),
-    onboarding: getItem<OnboardingData>(KEYS.onboarding),
-    diagnostic: getItem<DiagnosticResult>(KEYS.diagnostic),
-  }),
-
-  clearAll: () => {
-    Object.values(KEYS).forEach(removeItem);
-  },
-};

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FileText,
@@ -13,12 +13,12 @@ import {
   Search,
 } from "lucide-react";
 import {
-  Badge,
   SearchComposer,
   ResourceCard,
 } from "@/components/ui";
 import { PageContainer } from "@/components/layout/page-container";
-import { MOCK_RESOURCES, TOPICS } from "@/lib/types";
+import { getLibraryResources, searchStructuredContent } from "@/lib/content";
+import { TOPICS } from "@/lib/types";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 16 },
@@ -42,14 +42,23 @@ export default function LibraryPage() {
   const [search, setSearch] = useState("");
   const [activeType, setActiveType] = useState("all");
   const [activeTopic, setActiveTopic] = useState("all");
+  const allResources = useMemo(() => getLibraryResources(), []);
+  const searchMatches = useMemo(
+    () =>
+      searchStructuredContent(search, {
+        legacyTopicId: activeTopic !== "all" ? activeTopic : undefined,
+      }),
+    [search, activeTopic]
+  );
 
-  const filtered = MOCK_RESOURCES.filter((r) => {
+  const filtered = allResources.filter((r) => {
     const matchesSearch =
       search === "" ||
       r.title.toLowerCase().includes(search.toLowerCase()) ||
-      r.description?.toLowerCase().includes(search.toLowerCase());
-    const matchesType = activeType === "all" || r.type === activeType;
-    const matchesTopic = activeTopic === "all" || r.topic === activeTopic;
+      r.summary.toLowerCase().includes(search.toLowerCase()) ||
+      r.tags.some((tag) => tag.toLowerCase().includes(search.toLowerCase()));
+    const matchesType = activeType === "all" || r.displayType === activeType;
+    const matchesTopic = activeTopic === "all" || r.legacyTopicIds.includes(activeTopic as typeof TOPICS[number]["id"]);
     return matchesSearch && matchesType && matchesTopic;
   });
 
@@ -124,10 +133,10 @@ export default function LibraryPage() {
         {/* Category summary cards */}
         <motion.div variants={fadeUp} custom={3} className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {[
-            { label: "Past Papers", count: MOCK_RESOURCES.filter(r => r.type === "past-paper").length, icon: FileText, color: "text-accent" },
-            { label: "Notes", count: MOCK_RESOURCES.filter(r => r.type === "notes").length, icon: BookOpen, color: "text-success" },
-            { label: "Worksheets", count: MOCK_RESOURCES.filter(r => r.type === "worksheet").length, icon: PenLine, color: "text-warning" },
-            { label: "Slides", count: MOCK_RESOURCES.filter(r => r.type === "slides").length, icon: Presentation, color: "text-accent" },
+            { label: "Past Papers", count: allResources.filter(r => r.displayType === "past-paper").length, icon: FileText, color: "text-accent" },
+            { label: "Notes", count: allResources.filter(r => r.displayType === "notes").length, icon: BookOpen, color: "text-success" },
+            { label: "Worksheets", count: allResources.filter(r => r.displayType === "worksheet").length, icon: PenLine, color: "text-warning" },
+            { label: "Slides", count: allResources.filter(r => r.displayType === "slides").length, icon: Presentation, color: "text-accent" },
             { label: "Topics", count: TOPICS.length, icon: SlidersHorizontal, color: "text-muted-foreground" },
           ].map((cat) => (
             <div key={cat.label} className="bg-card border border-border rounded-xl p-4 hover:border-border-light transition-colors card-interactive">
@@ -140,6 +149,73 @@ export default function LibraryPage() {
 
         {/* Resource grid */}
         <motion.div variants={fadeUp} custom={4} className="space-y-4">
+          {search && (
+            <div className="grid gap-4 lg:grid-cols-3">
+              <div className="rounded-2xl border border-border bg-card/70 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground mb-3">
+                  Curriculum Matches
+                </p>
+                <div className="space-y-2">
+                  {searchMatches.curriculumPoints.length > 0 ? (
+                    searchMatches.curriculumPoints.slice(0, 3).map((point) => (
+                      <div key={point.id} className="rounded-xl border border-border bg-surface/40 px-3 py-3">
+                        <p className="text-xs text-accent font-medium">{point.code}</p>
+                        <p className="text-sm font-medium text-foreground mt-1">{point.title}</p>
+                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{point.summary}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No numbered curriculum points matched this search yet.</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-border bg-card/70 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground mb-3">
+                  Question Matches
+                </p>
+                <div className="space-y-2">
+                  {searchMatches.questions.length > 0 ? (
+                    searchMatches.questions.slice(0, 3).map((question) => (
+                      <div key={question.id} className="rounded-xl border border-border bg-surface/40 px-3 py-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-medium text-foreground">{question.title}</p>
+                          {question.marks && (
+                            <span className="text-[11px] text-accent">{question.marks} marks</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">{question.sourceLabel}</p>
+                        <p className="text-xs text-muted mt-2 line-clamp-2">{question.expectation}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No linked question metadata matched this search.</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-border bg-card/70 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground mb-3">
+                  Key Terms
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {searchMatches.glossaryTerms.length > 0 ? (
+                    searchMatches.glossaryTerms.slice(0, 8).map((term) => (
+                      <span
+                        key={term.id}
+                        className="rounded-lg border border-border bg-surface/40 px-2.5 py-1.5 text-xs text-foreground"
+                      >
+                        {term.term}
+                      </span>
+                    ))
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No glossary terms matched this search.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-sm text-muted">
               {filtered.length} resource{filtered.length !== 1 ? "s" : ""}
@@ -172,13 +248,15 @@ export default function LibraryPage() {
                 className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
               >
                 {filtered.map((resource, i) => {
-                  const topicData = TOPICS.find((t) => t.id === resource.topic);
+                  const topicData = resource.legacyTopicIds
+                    .map((topicId) => TOPICS.find((topic) => topic.id === topicId))
+                    .find(Boolean);
                   return (
                     <ResourceCard
                       key={resource.id}
                       title={resource.title}
-                      description={resource.description}
-                      type={resource.type}
+                      description={resource.summary}
+                      type={resource.displayType}
                       topic={topicData?.label}
                       topicIcon={topicData?.icon}
                       year={resource.year}

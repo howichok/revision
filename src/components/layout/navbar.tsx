@@ -1,12 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { BookOpen, Library, Home, LogOut } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { BookOpen, Library, Home, LogOut, Settings2 } from "lucide-react";
+import { useAppData } from "@/components/providers/app-data-provider";
 import { cn } from "@/lib/utils";
-import { storage } from "@/lib/storage";
-import type { UserProfile } from "@/lib/types";
 
 const navLinks = [
   { href: "/home", label: "Home", icon: Home },
@@ -16,12 +14,8 @@ const navLinks = [
 
 export function Navbar() {
   const pathname = usePathname();
-  const router = useRouter();
-  const [user, setUser] = useState<UserProfile | null>(null);
-
-  useEffect(() => {
-    setUser(storage.getUser());
-  }, []);
+  const { signOut, user } = useAppData();
+  const isSettingsActive = pathname.startsWith("/settings");
 
   return (
     <nav className="sticky top-0 z-50 glass">
@@ -60,14 +54,33 @@ export function Navbar() {
 
         {/* User section — always renders same structure; nickname populates after mount */}
         <div className="flex items-center gap-3">
-          <span className="text-xs text-muted hidden sm:block min-w-0">
-            {user?.nickname ?? "\u00A0"}
-          </span>
+          <Link
+            href="/settings"
+            className={cn(
+              "hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl text-xs transition-colors min-w-0",
+              isSettingsActive
+                ? "bg-accent/10 text-accent"
+                : "text-muted hover:text-foreground hover:bg-card"
+            )}
+            title="Account settings"
+          >
+            <span className="truncate max-w-[120px]">{user?.nickname ?? "\u00A0"}</span>
+            <Settings2 size={14} className="shrink-0" />
+          </Link>
+          <Link
+            href="/settings"
+            className={cn(
+              "sm:hidden p-2 rounded-lg transition-colors",
+              isSettingsActive
+                ? "bg-accent/10 text-accent"
+                : "text-muted-foreground hover:text-foreground hover:bg-card"
+            )}
+            title="Account settings"
+          >
+            <Settings2 size={16} />
+          </Link>
           <button
-            onClick={() => {
-              storage.clearAll();
-              router.push("/");
-            }}
+            onClick={() => void signOut()}
             className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-card transition-colors cursor-pointer"
             title="Sign out"
           >
