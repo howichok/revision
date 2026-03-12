@@ -37,6 +37,7 @@ import {
 } from "@/lib/types";
 import {
   formatRelativeTime,
+  getRevisitQueue,
   getStudiedTopicCount,
   getThisWeekMinutes,
   hydrateMaterialsWithProgress,
@@ -120,9 +121,19 @@ export default function HomePage() {
     minutesThisWeek > 0 ? `${(minutesThisWeek / 60).toFixed(1)}h` : "\u2014";
   const topicsCovered = getStudiedTopicCount(diagnostic);
   const recentActivity = activityHistory.slice(0, 4);
+  const revisitQueue = getRevisitQueue(
+    diagnostic,
+    onboarding,
+    revisionProgress,
+    activityHistory,
+    3
+  );
+  const nextQueueItem = revisitQueue[0] ?? null;
   const recommendedMaterials = hydrateMaterialsWithProgress(
     getRecommendedMaterialCards(
-      weakestTopics.map((topic) => topic.category),
+      revisitQueue.length > 0
+        ? revisitQueue.map((topic) => topic.topicId)
+        : weakestTopics.map((topic) => topic.category),
       3
     ),
     revisionProgress
@@ -264,13 +275,22 @@ export default function HomePage() {
                 <div className="min-w-0">
                   <h3 className="font-semibold text-base mb-0.5">Next Step</h3>
                   <p className="text-sm text-muted leading-relaxed">
-                    {hasDiagnostic && weakestTopics[0]
-                      ? `Focus on ${weakestTopics[0].topic} \u2014 your weakest area at ${Math.round((weakestTopics[0].score / weakestTopics[0].maxScore) * 100)}%.`
+                    {hasDiagnostic && nextQueueItem
+                      ? `${nextQueueItem.topicLabel} is due next. ${nextQueueItem.nextAction}.`
+                      : hasDiagnostic && weakestTopics[0]
+                        ? `Focus on ${weakestTopics[0].topic} \u2014 your weakest area at ${Math.round((weakestTopics[0].score / weakestTopics[0].maxScore) * 100)}%.`
                       : "Run the diagnostic test so we can build your personalised revision plan."}
                   </p>
                 </div>
               </div>
-              <Link href="/revision" className="shrink-0">
+              <Link
+                href={
+                  nextQueueItem
+                    ? `/revision/${nextQueueItem.topicId}?tab=practice`
+                    : "/revision"
+                }
+                className="shrink-0"
+              >
                 <Button size="sm" className="group">
                   {hasDiagnostic ? "Continue Revision" : "Start Diagnostic"}
                   <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />
@@ -280,8 +300,99 @@ export default function HomePage() {
           </Card>
         </motion.div>
 
+        {hasDiagnostic && revisitQueue.length > 0 && (
+          <motion.div variants={fadeUp} custom={2}>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Target size={15} className="text-accent" />
+                <h3 className="text-sm font-semibold">Revisit Queue</h3>
+              </div>
+              <span className="text-xs text-muted-foreground">
+                Ranked by weakness, practice gaps, and recency
+              </span>
+            </div>
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+              {revisitQueue.map((item) => (
+                <Link
+                  key={item.topicId}
+                  href={`/revision/${item.topicId}?tab=practice`}
+                  className="group"
+                >
+                  <Card hover className="h-full">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">{item.topicIcon}</span>
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">
+                              {item.topicLabel}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground">
+                              {item.urgency === "due-now"
+                                ? "Due now"
+                                : item.urgency === "revisit-soon"
+                                  ? "Revisit soon"
+                                  : "Keep warm"}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <Badge
+                        variant={
+                          item.urgency === "due-now"
+                            ? "danger"
+                            : item.urgency === "revisit-soon"
+                              ? "warning"
+                              : "success"
+                        }
+                      >
+                        {item.priority}
+                      </Badge>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-xl border border-border bg-surface/30 px-3 py-3">
+                        <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                          Practice
+                        </p>
+                        <p className="mt-2 text-lg font-semibold text-foreground">
+                          {item.practicePercent}%
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-border bg-surface/30 px-3 py-3">
+                        <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                          Diagnostic
+                        </p>
+                        <p className="mt-2 text-lg font-semibold text-foreground">
+                          {item.diagnosticPercent ?? "\u2014"}%
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 space-y-2">
+                      {item.reasons.map((reason) => (
+                        <div
+                          key={`${item.topicId}-${reason}`}
+                          className="rounded-xl border border-border bg-surface/20 px-3 py-2 text-xs text-muted-foreground"
+                        >
+                          {reason}
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-4 flex items-center gap-1 text-xs font-medium text-accent">
+                      {item.nextAction}
+                      <ArrowRight size={12} className="transition-transform group-hover:translate-x-0.5" />
+                    </div>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
         {/* ─── Row 3: Revision + Library ─── */}
-        <motion.div variants={fadeUp} custom={2} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <motion.div variants={fadeUp} custom={hasDiagnostic ? 3 : 2} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Link href="/revision" className="group">
             <Card hover className="h-full relative overflow-hidden">
               <div className="absolute top-0 right-0 w-24 h-24 bg-accent/4 rounded-full -translate-y-1/2 translate-x-1/2" />
@@ -320,7 +431,7 @@ export default function HomePage() {
 
         {/* ─── Post-diagnostic: Recommended materials (before Focus/Weakest) ─── */}
         {hasDiagnostic && (
-          <motion.div variants={fadeUp} custom={3}>
+          <motion.div variants={fadeUp} custom={4}>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <Star size={15} className="text-accent" />
@@ -345,7 +456,7 @@ export default function HomePage() {
 
         {/* ─── Post-diagnostic: Recent Activity ─── */}
         {hasDiagnostic && (
-          <motion.div variants={fadeUp} custom={4}>
+          <motion.div variants={fadeUp} custom={5}>
             <div className="bg-card border border-border rounded-2xl p-5 card-interactive">
               <div className="flex items-center gap-2 mb-4">
                 <Clock size={15} className="text-muted-foreground" />
@@ -372,7 +483,7 @@ export default function HomePage() {
         )}
 
         {/* ─── Row 4: Focus Topics + Weakest Areas (secondary) ─── */}
-        <motion.div variants={fadeUp} custom={hasDiagnostic ? 5 : 3} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <motion.div variants={fadeUp} custom={hasDiagnostic ? 6 : 3} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="bg-card border border-border rounded-2xl p-5 card-interactive">
             <div className="flex items-center gap-2 mb-3">
               <Target size={15} className="text-accent" />

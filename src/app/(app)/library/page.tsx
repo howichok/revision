@@ -17,7 +17,12 @@ import {
   ResourceCard,
 } from "@/components/ui";
 import { PageContainer } from "@/components/layout/page-container";
-import { getLibraryResources, searchStructuredContent } from "@/lib/content";
+import {
+  getLibraryResources,
+  searchLibraryResources,
+  searchStructuredContent,
+} from "@/lib/content";
+import { searchTopicMetadata } from "@/lib/topic-search";
 import { TOPICS } from "@/lib/types";
 
 const fadeUp = {
@@ -43,6 +48,13 @@ export default function LibraryPage() {
   const [activeType, setActiveType] = useState("all");
   const [activeTopic, setActiveTopic] = useState("all");
   const allResources = useMemo(() => getLibraryResources(), []);
+  const topicSearch = useMemo(
+    () =>
+      searchTopicMetadata(search, {
+        activeTopicId: activeTopic !== "all" ? activeTopic : undefined,
+      }),
+    [search, activeTopic]
+  );
   const searchMatches = useMemo(
     () =>
       searchStructuredContent(search, {
@@ -50,16 +62,29 @@ export default function LibraryPage() {
       }),
     [search, activeTopic]
   );
+  const matchedTopicIds = useMemo(() => {
+    return Array.from(
+      new Set([
+        ...topicSearch.directMatches.map((match) => match.topicId),
+        ...topicSearch.relatedMatches.map((match) => match.topicId),
+        ...topicSearch.suggestedTopics.map((topic) => topic.topicId),
+      ])
+    );
+  }, [topicSearch.directMatches, topicSearch.relatedMatches, topicSearch.suggestedTopics]);
 
-  const filtered = allResources.filter((r) => {
-    const matchesSearch =
-      search === "" ||
-      r.title.toLowerCase().includes(search.toLowerCase()) ||
-      r.summary.toLowerCase().includes(search.toLowerCase()) ||
-      r.tags.some((tag) => tag.toLowerCase().includes(search.toLowerCase()));
+  const rankedResources = useMemo(
+    () =>
+      searchLibraryResources(search, {
+        legacyTopicId: activeTopic !== "all" ? activeTopic : undefined,
+        matchedTopicIds,
+      }),
+    [activeTopic, matchedTopicIds, search]
+  );
+
+  const filtered = (search ? rankedResources : allResources).filter((r) => {
     const matchesType = activeType === "all" || r.displayType === activeType;
     const matchesTopic = activeTopic === "all" || r.legacyTopicIds.includes(activeTopic as typeof TOPICS[number]["id"]);
-    return matchesSearch && matchesType && matchesTopic;
+    return matchesType && matchesTopic;
   });
 
   return (
@@ -150,7 +175,55 @@ export default function LibraryPage() {
         {/* Resource grid */}
         <motion.div variants={fadeUp} custom={4} className="space-y-4">
           {search && (
-            <div className="grid gap-4 lg:grid-cols-3">
+            <div className="grid gap-4 xl:grid-cols-4">
+              <div className="rounded-2xl border border-border bg-card/70 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    Topic Matches
+                  </p>
+                  {topicSearch.noDirectMatch ? (
+                    <span className="text-[10px] text-warning">closest results</span>
+                  ) : (
+                    <span className="text-[10px] text-success">ranked</span>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  {topicSearch.directMatches.length > 0 ? (
+                    topicSearch.directMatches.slice(0, 3).map((match) => (
+                      <div key={match.id} className="rounded-xl border border-border bg-surface/40 px-3 py-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-medium text-foreground">
+                            {match.topicIcon} {match.subtopicTitle}
+                          </p>
+                          <span className="text-[11px] text-accent">{match.score}</span>
+                        </div>
+                        <p className="mt-1 text-[11px] text-muted-foreground">
+                          {match.topicTitle} / {match.section}
+                        </p>
+                        <p className="mt-2 text-xs text-muted line-clamp-2">{match.shortDescription}</p>
+                      </div>
+                    ))
+                  ) : topicSearch.relatedMatches.length > 0 ? (
+                    topicSearch.relatedMatches.slice(0, 3).map((match) => (
+                      <div key={match.id} className="rounded-xl border border-border bg-surface/40 px-3 py-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-medium text-foreground">
+                            {match.topicIcon} {match.subtopicTitle}
+                          </p>
+                          <span className="text-[11px] text-muted-foreground">{match.score}</span>
+                        </div>
+                        <p className="mt-1 text-[11px] text-muted-foreground">
+                          {match.topicTitle} / {match.section}
+                        </p>
+                        <p className="mt-2 text-xs text-muted line-clamp-2">{match.reasons[0] ?? match.shortDescription}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No topic matches yet for this search.</p>
+                  )}
+                </div>
+              </div>
+
               <div className="rounded-2xl border border-border bg-card/70 p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground mb-3">
                   Curriculum Matches
@@ -219,6 +292,7 @@ export default function LibraryPage() {
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-sm text-muted">
               {filtered.length} resource{filtered.length !== 1 ? "s" : ""}
+              {search ? " ranked by relevance" : ""}
             </h2>
             <button className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-muted transition-colors cursor-pointer">
               <Filter size={12} />

@@ -1,7 +1,7 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   AlertCircle,
@@ -16,11 +16,12 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { useAppData } from "@/components/providers/app-data-provider";
-import { WrittenAnswerChecker } from "@/components/revision/written-answer-checker";
+import { TopicPracticeStudio } from "@/components/revision/topic-practice-studio";
 import { Button, Card, CardContent, ProgressBar, Badge } from "@/components/ui";
 import { PageContainer } from "@/components/layout/page-container";
 import { getMarkSchemeConceptsForQuestion, getTopicContentBundle } from "@/lib/content";
-import { getSubtopicProgressForTopic } from "@/lib/progress";
+import { getPracticeSetProgress, getSubtopicProgressForTopic } from "@/lib/progress";
+import { getPracticeSetId } from "@/lib/practice";
 import { getTopicById, getTopicTree } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -36,6 +37,10 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]["id"];
 
+function isTabId(value: string | null): value is TabId {
+  return TABS.some((tab) => tab.id === value);
+}
+
 function getScoreVariant(pct: number): "success" | "warning" | "danger" {
   if (pct >= 75) return "success";
   if (pct >= 50) return "warning";
@@ -45,9 +50,13 @@ function getScoreVariant(pct: number): "success" | "warning" | "danger" {
 export default function TopicPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const topicId = typeof params.topicId === "string" ? params.topicId : "";
   const { diagnostic, onboarding, revisionProgress, toggleSubtopicReview } = useAppData();
-  const [activeTab, setActiveTab] = useState<TabId>("overview");
+  const [activeTab, setActiveTab] = useState<TabId>(() => {
+    const requestedTab = searchParams.get("tab");
+    return isTabId(requestedTab) ? requestedTab : "overview";
+  });
   const [pendingSubtopicId, setPendingSubtopicId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
@@ -73,12 +82,46 @@ export default function TopicPage() {
         ) ?? []
       : tree?.subtopics ?? [];
   const topicProgress = getSubtopicProgressForTopic(revisionProgress, topicId);
+  const practiceSetProgress = [
+    {
+      label: "Recall cycle",
+      entry: getPracticeSetProgress(
+        revisionProgress,
+        topicId,
+        getPracticeSetId(topicId, "recall")
+      ),
+    },
+    {
+      label: "Exam drill",
+      entry: getPracticeSetProgress(
+        revisionProgress,
+        topicId,
+        getPracticeSetId(topicId, "exam-drill")
+      ),
+    },
+    {
+      label: "Quick quiz",
+      entry: getPracticeSetProgress(
+        revisionProgress,
+        topicId,
+        getPracticeSetId(topicId, "quiz")
+      ),
+    },
+  ];
   const allKeywords = Array.from(
     new Set([
       ...(tree?.subtopics.flatMap((subtopic) => subtopic.keywords) ?? []),
       ...topicContent.terms.map((term) => term.term),
     ])
   );
+
+  useEffect(() => {
+    const requestedTab = searchParams.get("tab");
+
+    if (isTabId(requestedTab) && requestedTab !== activeTab) {
+      setActiveTab(requestedTab);
+    }
+  }, [activeTab, searchParams]);
 
   if (!topicInfo || !tree) {
     return (
@@ -156,7 +199,10 @@ export default function TopicPage() {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  router.replace(`/revision/${topicId}?tab=${tab.id}`, { scroll: false });
+                }}
                 className={cn(
                   "flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-lg transition-colors",
                   isActive
@@ -334,7 +380,7 @@ export default function TopicPage() {
             )}
 
             {activeTab === "practice" && (
-              <WrittenAnswerChecker topicId={topicId} topicLabel={topicInfo.label} />
+              <TopicPracticeStudio topicId={topicId} topicLabel={topicInfo.label} />
             )}
 
             {activeTab === "exam-questions" && (
@@ -467,6 +513,37 @@ export default function TopicPage() {
                           ) : (
                             <Badge variant="default">Pending</Badge>
                           )}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="space-y-2 pt-2">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                        Practice sets
+                      </p>
+                      {practiceSetProgress.map((set) => (
+                        <div
+                          key={set.label}
+                          className="flex items-center justify-between rounded-xl border border-border bg-surface/30 p-3"
+                        >
+                          <div>
+                            <p className="text-sm text-foreground">{set.label}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {set.entry
+                                ? `Saved progress ${set.entry.progressPercent}%`
+                                : "Not started yet"}
+                            </p>
+                          </div>
+                          <Badge
+                            variant={
+                              (set.entry?.progressPercent ?? 0) >= 70
+                                ? "success"
+                                : (set.entry?.progressPercent ?? 0) >= 40
+                                  ? "warning"
+                                  : "default"
+                            }
+                          >
+                            {set.entry?.progressPercent ?? 0}%
+                          </Badge>
                         </div>
                       ))}
                     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -17,6 +17,12 @@ import { Button } from "@/components/ui";
 import { TopicAccordion } from "@/components/onboarding/topic-accordion";
 import { SmartInputPanel } from "@/components/onboarding/smart-input-panel";
 import { TOPICS, getTopicTree, getTopicById } from "@/lib/types";
+import {
+  clearFocusBreakdownDraft,
+  loadFocusBreakdownDraft,
+  saveFocusBreakdownDraft,
+  type FocusTopicOrigin,
+} from "@/lib/focus-draft";
 import type { TopicTree } from "@/lib/types";
 
 const EASE = [0.25, 0.46, 0.45, 0.94] as [number, number, number, number];
@@ -28,34 +34,141 @@ const STEPS = [
   { label: "Dashboard", done: false },
 ];
 
+const ORIGIN_PRIORITY: Record<FocusTopicOrigin, number> = {
+  "auto-added": 1,
+  confirmed: 2,
+  "weak-area": 3,
+};
+
+function mergeTopicOrder(primary: string[], secondary: string[]) {
+  return [...new Set([...primary, ...secondary])];
+}
+
+function mergeTopicOrigin(
+  current: FocusTopicOrigin | undefined,
+  next: FocusTopicOrigin
+): FocusTopicOrigin {
+  if (!current) {
+    return next;
+  }
+
+  return ORIGIN_PRIORITY[next] > ORIGIN_PRIORITY[current] ? next : current;
+}
+
 export default function FocusBreakdownPage() {
   const router = useRouter();
-  const { onboarding, saveFocusBreakdown } = useAppData();
+  const { user, onboarding, saveFocusBreakdown } = useAppData();
 
-  const [weakAreas, setWeakAreas] = useState<string[]>([]);
+  const [topicOrder, setTopicOrder] = useState<string[]>([]);
+  const [topicOrigins, setTopicOrigins] = useState<Record<string, FocusTopicOrigin>>({});
   const [openTopicId, setOpenTopicId] = useState<string | null>(null);
   const [selectedSubtopics, setSelectedSubtopics] = useState<Record<string, string[]>>({});
   const [freeTextNotes, setFreeTextNotes] = useState<Record<string, string>>({});
   const [globalFreeText, setGlobalFreeText] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
+  const initializedUserRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!onboarding) return;
-    setWeakAreas(onboarding.weakAreas);
-    setSelectedSubtopics(onboarding.focusBreakdown?.selectedSubtopics ?? {});
-    setFreeTextNotes(onboarding.focusBreakdown?.freeTextNotes ?? {});
-    setGlobalFreeText(onboarding.focusBreakdown?.globalNote ?? "");
-    if (onboarding.weakAreas.length > 0) {
-      setOpenTopicId(onboarding.weakAreas[0]);
+    if (!user?.id || !onboarding) {
+      return;
     }
-  }, [onboarding]);
+
+    if (initializedUserRef.current === user.id) {
+      return;
+    }
+
+    const draft = loadFocusBreakdownDraft(user.id);
+    const remoteTopicOrder = onboarding.weakAreas ?? [];
+    const mergedTopicOrder = mergeTopicOrder(
+      remoteTopicOrder,
+      draft?.topicOrder ?? []
+    );
+    const mergedTopicOrigins = mergedTopicOrder.reduce<Record<string, FocusTopicOrigin>>(
+      (accumulator, topicId) => {
+        const remoteOrigin = remoteTopicOrder.includes(topicId)
+          ? "weak-area"
+          : undefined;
+        const draftOrigin = draft?.topicOrigins?.[topicId];
+        accumulator[topicId] = mergeTopicOrigin(
+          remoteOrigin,
+          draftOrigin ?? remoteOrigin ?? "auto-added"
+        );
+        return accumulator;
+      },
+      {}
+    );
+
+    setTopicOrder(mergedTopicOrder);
+    setTopicOrigins(mergedTopicOrigins);
+    setSelectedSubtopics({
+      ...(onboarding.focusBreakdown?.selectedSubtopics ?? {}),
+      ...(draft?.selectedSubtopics ?? {}),
+    });
+    setFreeTextNotes({
+      ...(onboarding.focusBreakdown?.freeTextNotes ?? {}),
+      ...(draft?.freeTextNotes ?? {}),
+    });
+    setGlobalFreeText(draft?.globalNote ?? onboarding.focusBreakdown?.globalNote ?? "");
+    setOpenTopicId(
+      draft?.openTopicId && mergedTopicOrder.includes(draft.openTopicId)
+        ? draft.openTopicId
+        : mergedTopicOrder[0] ?? null
+    );
+    initializedUserRef.current = user.id;
+  }, [onboarding, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || initializedUserRef.current !== user.id) {
+      return;
+    }
+
+    if (topicOrder.length === 0) {
+      clearFocusBreakdownDraft(user.id);
+      return;
+    }
+
+    saveFocusBreakdownDraft(user.id, {
+      topicOrder,
+      topicOrigins,
+      selectedSubtopics,
+      freeTextNotes,
+      globalNote: globalFreeText,
+      openTopicId,
+    });
+  }, [
+    freeTextNotes,
+    globalFreeText,
+    openTopicId,
+    selectedSubtopics,
+    topicOrder,
+    topicOrigins,
+    user?.id,
+  ]);
+
+  useEffect(() => {
+    if (!openTopicId && topicOrder.length > 0) {
+      setOpenTopicId(topicOrder[0]);
+      return;
+    }
+
+    if (openTopicId && !topicOrder.includes(openTopicId)) {
+      setOpenTopicId(topicOrder[0] ?? null);
+    }
+  }, [openTopicId, topicOrder]);
 
   const handleAccordionToggle = useCallback((topicId: string) => {
     setOpenTopicId((prev) => (prev === topicId ? null : topicId));
   }, []);
 
   const handleSubtopicToggle = useCallback((topicId: string, subtopicId: string) => {
+    setTopicOrigins((prev) => {
+      if (prev[topicId] !== "auto-added") {
+        return prev;
+      }
+
+      return { ...prev, [topicId]: "confirmed" };
+    });
     setSelectedSubtopics((prev) => {
       const current = prev[topicId] || [];
       const updated = current.includes(subtopicId)
@@ -70,18 +183,26 @@ export default function FocusBreakdownPage() {
   }, []);
 
   const handleAutoTopicAdd = useCallback((topicId: string) => {
-    setWeakAreas((prev) => {
+    setTopicOrder((prev) => {
       if (prev.includes(topicId)) return prev;
       return [...prev, topicId];
     });
-    setOpenTopicId(topicId);
+    setTopicOrigins((prev) => ({
+      ...prev,
+      [topicId]: mergeTopicOrigin(prev[topicId], "auto-added"),
+    }));
+    setOpenTopicId((prev) => prev ?? topicId);
   }, []);
 
   const handleGlobalMatchSelect = useCallback((topicId: string, subtopicId: string) => {
-    setWeakAreas((prev) => {
+    setTopicOrder((prev) => {
       if (prev.includes(topicId)) return prev;
       return [...prev, topicId];
     });
+    setTopicOrigins((prev) => ({
+      ...prev,
+      [topicId]: mergeTopicOrigin(prev[topicId], "confirmed"),
+    }));
     setOpenTopicId(topicId);
     setSelectedSubtopics((prev) => {
       const current = prev[topicId] || [];
@@ -95,11 +216,14 @@ export default function FocusBreakdownPage() {
     setIsSaving(true);
     try {
       await saveFocusBreakdown({
-        weakAreas,
+        weakAreas: topicOrder,
         selectedSubtopics,
         freeTextNotes,
         globalNote: globalFreeText,
       });
+      if (user?.id) {
+        clearFocusBreakdownDraft(user.id);
+      }
       router.push("/home");
       router.refresh();
     } catch (saveError) {
@@ -118,6 +242,7 @@ export default function FocusBreakdownPage() {
   }
 
   const totalSelected = Object.values(selectedSubtopics).flat().length;
+  const weakAreas = topicOrder;
   const activeTree: TopicTree | undefined = openTopicId ? getTopicTree(openTopicId) : undefined;
   const activeTopic = openTopicId ? getTopicById(openTopicId) : null;
 
@@ -251,6 +376,7 @@ export default function FocusBreakdownPage() {
                       tree={tree}
                       topicIcon={topic.icon}
                       topicLabel={topic.label}
+                      topicOrigin={topicOrigins[topicId]}
                       isOpen={openTopicId === topicId}
                       onToggle={() => handleAccordionToggle(topicId)}
                       selectedSubtopics={selectedSubtopics[topicId] || []}
@@ -271,6 +397,7 @@ export default function FocusBreakdownPage() {
           >
             <div className="lg:sticky lg:top-8 min-h-[520px] max-h-[calc(100vh-6rem)] flex flex-col">
               <SmartInputPanel
+                key={activeTree?.topicId ?? "global"}
                 activeTree={activeTree || null}
                 topicLabel={activeTopic?.label ?? ""}
                 topicIcon={activeTopic?.icon ?? ""}
@@ -278,12 +405,13 @@ export default function FocusBreakdownPage() {
                 onSubtopicToggle={(subId) => {
                   if (openTopicId) handleSubtopicToggle(openTopicId, subId);
                 }}
-                freeText={openTopicId ? (freeTextNotes[openTopicId] || "") : globalFreeText}
-                onFreeTextChange={(text) => {
+                noteText={openTopicId ? (freeTextNotes[openTopicId] || "") : globalFreeText}
+                onNoteChange={(text) => {
                   if (openTopicId) handleFreeTextChange(openTopicId, text);
                   else setGlobalFreeText(text);
                 }}
                 weakAreas={weakAreas}
+                topicOrigins={topicOrigins}
                 onAutoTopicAdd={handleAutoTopicAdd}
                 onGlobalMatchSelect={handleGlobalMatchSelect}
               />

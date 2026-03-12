@@ -1,21 +1,25 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowUp,
-  Sparkles,
-  ArrowRight,
+  Check,
   Plus,
   Search,
-  MessageSquare,
-  Zap,
+  Sparkles,
+  Target,
 } from "lucide-react";
+import { Badge, Button } from "@/components/ui";
+import type { FocusTopicOrigin } from "@/lib/focus-draft";
+import {
+  getSuggestedSearchTerms,
+  searchTopicMetadata,
+  type TopicSearchResult,
+  type TopicSearchSuggestion,
+} from "@/lib/topic-search";
+import type { TopicTree } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { TOPIC_TREES, TOPICS } from "@/lib/types";
-import type { TopicTree, Subtopic } from "@/lib/types";
-
-/* ─── Types ─── */
 
 interface SmartInputPanelProps {
   activeTree: TopicTree | null;
@@ -23,323 +27,173 @@ interface SmartInputPanelProps {
   topicIcon: string;
   selectedSubtopics: string[];
   onSubtopicToggle: (subtopicId: string) => void;
-  freeText: string;
-  onFreeTextChange: (text: string) => void;
+  noteText: string;
+  onNoteChange: (text: string) => void;
   weakAreas?: string[];
+  topicOrigins?: Record<string, FocusTopicOrigin>;
   onAutoTopicAdd?: (topicId: string) => void;
   onGlobalMatchSelect?: (topicId: string, subtopicId: string) => void;
 }
 
-interface SuggestionMatch {
-  subtopic: Subtopic;
-  matchedKeywords: string[];
-  confidence: "high" | "medium" | "low";
-}
+const MATCH_BADGE_VARIANTS = {
+  "Strong match": "success",
+  "Partial match": "accent",
+  Related: "default",
+} as const;
 
-interface GlobalMatch {
-  topicId: string;
-  topicLabel: string;
-  topicIcon: string;
-  subtopic: Subtopic;
-  matchedKeywords: string[];
-  confidence: "high" | "medium" | "low";
-}
-
-interface CrossTopicDetection {
-  topicId: string;
-  topicLabel: string;
-  topicIcon: string;
-  matchedKeywords: string[];
-  confidence: "high" | "medium" | "low";
-}
-
-interface SentQuery {
-  id: string;
-  text: string;
-  topicLabel: string;
-  matches: SuggestionMatch[];
-  globalMatches?: GlobalMatch[];
-  bestTopic?: { topicId: string; topicLabel: string; topicIcon: string; matchCount: number } | null;
-  crossTopicDetection?: CrossTopicDetection;
-  timestamp: number;
-}
-
-/* ─── Matching logic ─── */
-
-function normaliseTerms(query: string): string[] {
-  return query
-    .toLowerCase()
-    .replace(/[^\w\s]/g, " ")
-    .split(/\s+/)
-    .filter((t) => t.length >= 2);
-}
-
-function findMatches(tree: TopicTree, query: string): SuggestionMatch[] {
-  const terms = normaliseTerms(query);
-  if (terms.length === 0) return [];
-
-  const matches: SuggestionMatch[] = [];
-  for (const sub of tree.subtopics) {
-    const matched: string[] = [];
-    for (const term of terms) {
-      for (const kw of sub.keywords) {
-        const kwLower = kw.toLowerCase();
-        if (
-          kwLower.includes(term) ||
-          (term.length >= 2 && kwLower.startsWith(term))
-        ) {
-          if (!matched.includes(kw)) matched.push(kw);
-        }
-      }
-      if (
-        sub.label.toLowerCase().includes(term) ||
-        (term.length >= 2 && sub.label.toLowerCase().startsWith(term))
-      ) {
-        if (!matched.includes(sub.label)) matched.push(sub.label);
-      }
-    }
-    if (matched.length > 0) {
-      const confidence =
-        matched.length >= 3 ? "high" : matched.length >= 2 ? "medium" : "low";
-      matches.push({ subtopic: sub, matchedKeywords: matched, confidence });
-    }
-  }
-
-  return matches.sort((a, b) => {
-    const order = { high: 0, medium: 1, low: 2 };
-    return order[a.confidence] - order[b.confidence];
-  });
-}
-
-function findCrossTopicMatch(
-  activeTopicId: string,
-  weakAreas: string[],
-  query: string
-): CrossTopicDetection | null {
-  const terms = normaliseTerms(query);
-  if (terms.length === 0) return null;
-
-  let bestMatch: CrossTopicDetection | null = null;
-  let bestCount = 0;
-
-  for (const tree of TOPIC_TREES) {
-    if (tree.topicId === activeTopicId || weakAreas.includes(tree.topicId)) continue;
-
-    const matchedKeywords: string[] = [];
-    for (const sub of tree.subtopics) {
-      for (const term of terms) {
-        for (const kw of sub.keywords) {
-          if (
-            (kw.toLowerCase().includes(term) ||
-              term.includes(kw.toLowerCase().slice(0, 4))) &&
-            !matchedKeywords.includes(kw)
-          ) {
-            matchedKeywords.push(kw);
-          }
-        }
-      }
-    }
-
-    if (matchedKeywords.length >= 2 && matchedKeywords.length > bestCount) {
-      const topicInfo = TOPICS.find((t) => t.id === tree.topicId);
-      bestCount = matchedKeywords.length;
-      bestMatch = {
-        topicId: tree.topicId,
-        topicLabel: topicInfo?.label ?? tree.topicId,
-        topicIcon: topicInfo?.icon ?? "",
-        matchedKeywords,
-        confidence: matchedKeywords.length >= 4 ? "high" : "medium",
-      };
-    }
-  }
-
-  return bestMatch;
-}
-
-function findGlobalMatches(query: string): {
-  matches: GlobalMatch[];
-  bestTopic: {
-    topicId: string;
-    topicLabel: string;
-    topicIcon: string;
-    matchCount: number;
-  } | null;
-} {
-  const terms = normaliseTerms(query);
-  if (terms.length === 0) return { matches: [], bestTopic: null };
-
-  const matches: GlobalMatch[] = [];
-  const topicCounts: Record<string, { label: string; icon: string; count: number }> = {};
-
-  for (const tree of TOPIC_TREES) {
-    const topicInfo = TOPICS.find((t) => t.id === tree.topicId);
-
-    for (const sub of tree.subtopics) {
-      const matched: string[] = [];
-      for (const term of terms) {
-        for (const kw of sub.keywords) {
-          const kwLower = kw.toLowerCase();
-          if (
-            kwLower.includes(term) ||
-            term.includes(kwLower.slice(0, Math.max(3, kwLower.length - 1)))
-          ) {
-            if (!matched.includes(kw)) matched.push(kw);
-          }
-        }
-        if (sub.label.toLowerCase().includes(term)) {
-          if (!matched.includes(sub.label)) matched.push(sub.label);
-        }
-        if (topicInfo && topicInfo.label.toLowerCase().includes(term)) {
-          if (!matched.includes(topicInfo.label)) matched.push(topicInfo.label);
-        }
-      }
-
-      if (matched.length > 0) {
-        const confidence =
-          matched.length >= 3 ? "high" : matched.length >= 2 ? "medium" : "low";
-        matches.push({
-          topicId: tree.topicId,
-          topicLabel: topicInfo?.label ?? tree.topicId,
-          topicIcon: topicInfo?.icon ?? "",
-          subtopic: sub,
-          matchedKeywords: matched,
-          confidence,
-        });
-
-        if (!topicCounts[tree.topicId]) {
-          topicCounts[tree.topicId] = {
-            label: topicInfo?.label ?? tree.topicId,
-            icon: topicInfo?.icon ?? "",
-            count: 0,
-          };
-        }
-        topicCounts[tree.topicId].count += matched.length;
-      }
-    }
-  }
-
-  let bestTopic: {
-    topicId: string;
-    topicLabel: string;
-    topicIcon: string;
-    matchCount: number;
-  } | null = null;
-  let bestCount = 0;
-  for (const [topicId, info] of Object.entries(topicCounts)) {
-    if (info.count > bestCount) {
-      bestCount = info.count;
-      bestTopic = {
-        topicId,
-        topicLabel: info.label,
-        topicIcon: info.icon,
-        matchCount: info.count,
-      };
-    }
-  }
-
-  return {
-    matches: matches.sort((a, b) => {
-      const order = { high: 0, medium: 1, low: 2 };
-      if (order[a.confidence] !== order[b.confidence])
-        return order[a.confidence] - order[b.confidence];
-      return b.matchedKeywords.length - a.matchedKeywords.length;
-    }),
-    bestTopic,
-  };
-}
-
-function getSmartSuggestions(
-  query: string,
-  isGlobalMode: boolean,
-  activeTree: TopicTree | null
-): string[] {
-  const q = query.trim().toLowerCase();
-  if (q.length < 2) return [];
-
-  const out: string[] = [];
-  if (isGlobalMode) {
-    for (const t of TOPICS) {
-      if (t.id === "esp") continue;
-      const label = t.label.toLowerCase();
-      if (
-        label.includes(q) ||
-        q.includes(label.slice(0, 4)) ||
-        label
-          .split(/\s+/)
-          .some((w) => w.startsWith(q) || q.startsWith(w.slice(0, 2)))
-      ) {
-        out.push(t.label);
-      }
-    }
-    if (out.length === 0) {
-      const first = q.slice(0, 2);
-      for (const t of TOPICS) {
-        if (t.id === "esp") continue;
-        if (
-          t.label.toLowerCase().includes(first) ||
-          t.label.toLowerCase().startsWith(first)
-        )
-          out.push(t.label);
-      }
-    }
-    if (out.length > 4) return out.slice(0, 4);
-    if (out.length > 0) return out;
-    return TOPICS.filter((t) => t.id !== "esp")
-      .slice(0, 4)
-      .map((t) => t.label);
-  }
-
-  if (activeTree) {
-    const seen = new Set<string>();
-    for (const sub of activeTree.subtopics) {
-      for (const kw of sub.keywords) {
-        const kwLower = kw.toLowerCase();
-        if (
-          kwLower.includes(q) ||
-          q.includes(kwLower.slice(0, 3)) ||
-          kwLower.startsWith(q)
-        ) {
-          if (!seen.has(kw)) {
-            seen.add(kw);
-            out.push(kw);
-          }
-        }
-      }
-      if (sub.label.toLowerCase().includes(q) && !seen.has(sub.label)) {
-        seen.add(sub.label);
-        out.push(sub.label);
-      }
-    }
-    if (out.length > 5) return out.slice(0, 5);
-    if (out.length > 0) return out;
-    activeTree.subtopics
-      .slice(0, 3)
-      .flatMap((s) => s.keywords.slice(0, 2))
-      .forEach((kw) => {
-        if (!out.includes(kw)) out.push(kw);
-      });
-  }
-  return out.slice(0, 5);
-}
-
-/* ─── Constants ─── */
-
-const SAMPLE_QUERIES = [
-  "SQL and databases",
-  "encryption, firewalls",
-  "decomposition, flowcharts",
-  "loops and variables",
-  "GDPR, data protection",
-  "phishing, social engineering",
-];
-
-const CONFIDENCE_STYLES = {
-  high: { bg: "bg-success/10 border-success/20", text: "text-success", dot: "bg-success" },
-  medium: { bg: "bg-warning/10 border-warning/20", text: "text-warning", dot: "bg-warning" },
-  low: { bg: "bg-muted-foreground/10 border-border", text: "text-muted-foreground", dot: "bg-muted-foreground" },
+const TOPIC_ORIGIN_BADGES: Record<FocusTopicOrigin, { label: string; className: string }> = {
+  "weak-area": {
+    label: "Weak topic",
+    className: "bg-warning/10 text-warning border border-warning/20",
+  },
+  "auto-added": {
+    label: "Auto-added",
+    className: "bg-accent/10 text-accent border border-accent/20",
+  },
+  confirmed: {
+    label: "Confirmed",
+    className: "bg-success/10 text-success border border-success/20",
+  },
 };
 
-/* ─── Component ─── */
+function MatchCard({
+  result,
+  isActive,
+  topicOrigin,
+  onSelect,
+}: {
+  result: TopicSearchResult;
+  isActive: boolean;
+  topicOrigin?: FocusTopicOrigin;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cn(
+        "w-full rounded-2xl border text-left transition-all duration-200 p-4",
+        isActive
+          ? "border-accent/35 bg-accent/6 shadow-[0_0_24px_-12px_rgba(139,92,246,0.28)]"
+          : "border-border/60 bg-surface/35 hover:border-border-light hover:bg-surface/55"
+      )}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-base shrink-0">{result.topicIcon}</span>
+            <p className="text-sm font-semibold text-foreground truncate">
+              {result.subtopicTitle}
+            </p>
+            <Badge
+              variant={MATCH_BADGE_VARIANTS[result.matchLabel]}
+              className="text-[10px]"
+            >
+              {result.matchLabel}
+            </Badge>
+            {topicOrigin && (
+              <span
+                className={cn(
+                  "inline-flex items-center rounded-lg px-2 py-0.5 text-[10px] font-medium",
+                  TOPIC_ORIGIN_BADGES[topicOrigin].className
+                )}
+              >
+                {TOPIC_ORIGIN_BADGES[topicOrigin].label}
+              </span>
+            )}
+          </div>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            {result.topicTitle} / {result.section}
+          </p>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="text-sm font-semibold text-foreground">{result.score}</p>
+          <p className="text-[10px] text-muted-foreground">match</p>
+        </div>
+      </div>
+
+      <p className="mt-3 text-xs text-muted-foreground leading-relaxed">
+        {result.shortDescription}
+      </p>
+
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {result.matchedTerms.slice(0, 4).map((term) => (
+          <span
+            key={term}
+            className="rounded-full border border-border/70 bg-card/70 px-2.5 py-1 text-[10px] text-foreground/80"
+          >
+            {term}
+          </span>
+        ))}
+      </div>
+
+      {result.reasons[0] && (
+        <p className="mt-3 text-[11px] text-muted-foreground">
+          {result.reasons[0]}
+        </p>
+      )}
+    </button>
+  );
+}
+
+function SuggestionCard({
+  suggestion,
+  topicOrigin,
+  onAdd,
+}: {
+  suggestion: TopicSearchSuggestion;
+  topicOrigin?: FocusTopicOrigin;
+  onAdd: () => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-border/60 bg-surface/35 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-base">{suggestion.topicIcon}</span>
+            <p className="text-sm font-semibold text-foreground">{suggestion.topicTitle}</p>
+            <Badge
+              variant={MATCH_BADGE_VARIANTS[suggestion.matchLabel]}
+              className="text-[10px]"
+            >
+              {suggestion.matchLabel}
+            </Badge>
+            {topicOrigin && (
+              <span
+                className={cn(
+                  "inline-flex items-center rounded-lg px-2 py-0.5 text-[10px] font-medium",
+                  TOPIC_ORIGIN_BADGES[topicOrigin].className
+                )}
+              >
+                {TOPIC_ORIGIN_BADGES[topicOrigin].label}
+              </span>
+            )}
+          </div>
+          <p className="mt-1 text-[11px] text-muted-foreground">{suggestion.section}</p>
+        </div>
+        <Button size="sm" variant="outline" onClick={onAdd}>
+          <Plus size={12} />
+          Add topic
+        </Button>
+      </div>
+
+      <p className="mt-3 text-xs text-muted-foreground leading-relaxed">
+        {suggestion.shortDescription}
+      </p>
+
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {suggestion.matchedTerms.slice(0, 4).map((term) => (
+          <span
+            key={term}
+            className="rounded-full border border-border/70 bg-card/70 px-2.5 py-1 text-[10px] text-foreground/80"
+          >
+            {term}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function SmartInputPanel({
   activeTree,
@@ -347,115 +201,84 @@ export function SmartInputPanel({
   topicIcon,
   selectedSubtopics,
   onSubtopicToggle,
-  freeText,
-  onFreeTextChange,
+  noteText,
+  onNoteChange,
   weakAreas = [],
+  topicOrigins = {},
   onAutoTopicAdd,
   onGlobalMatchSelect,
 }: SmartInputPanelProps) {
   const [isFocused, setIsFocused] = useState(false);
-  const [sentQueries, setSentQueries] = useState<SentQuery[]>([]);
-  const [isSending, setIsSending] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [queryText, setQueryText] = useState("");
+  const [lastQuery, setLastQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [activeResultId, setActiveResultId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const isGlobalMode = !activeTree;
+  const suggestedTerms = useMemo(() => {
+    return getSuggestedSearchTerms(activeTree?.topicId ?? null);
+  }, [activeTree?.topicId]);
+
+  const searchResults = useMemo(() => {
+    return searchTopicMetadata(lastQuery, {
+      activeTopicId: activeTree?.topicId ?? null,
+    });
+  }, [activeTree?.topicId, lastQuery]);
+
+  const visibleResults = useMemo(() => {
+    return [...searchResults.directMatches, ...searchResults.relatedMatches];
+  }, [searchResults.directMatches, searchResults.relatedMatches]);
+
+  const activeResult =
+    visibleResults.find((result) => result.id === activeResultId) ??
+    searchResults.topMatch;
 
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      scrollRef.current.scrollTop = 0;
     }
-  }, [sentQueries]);
+  }, [searchResults.directMatches, searchResults.relatedMatches, searchResults.suggestedTopics]);
 
-  const handleSend = useCallback(() => {
-    if (!freeText.trim() || isSending) return;
+  function handleSearch() {
+    if (!queryText.trim() || isSearching) {
+      return;
+    }
 
-    const queryText = freeText.trim();
-    setIsSending(true);
+    setIsSearching(true);
+    const nextQuery = queryText.trim();
 
-    setTimeout(() => {
-      let matches: SuggestionMatch[] = [];
-      let globalMatchesResult: GlobalMatch[] | undefined;
-      let bestTopicResult: {
-        topicId: string;
-        topicLabel: string;
-        topicIcon: string;
-        matchCount: number;
-      } | null = null;
-      let crossTopicDetection: CrossTopicDetection | undefined;
-
-      if (activeTree) {
-        matches = findMatches(activeTree, queryText);
-        if (onAutoTopicAdd) {
-          const detected = findCrossTopicMatch(
-            activeTree.topicId,
-            weakAreas,
-            queryText
-          );
-          if (detected) {
-            crossTopicDetection = detected;
-            onAutoTopicAdd(detected.topicId);
-          }
-        }
-      } else {
-        const result = findGlobalMatches(queryText);
-        globalMatchesResult = result.matches;
-        bestTopicResult = result.bestTopic;
-        if (
-          bestTopicResult &&
-          bestTopicResult.matchCount >= 2 &&
-          onAutoTopicAdd &&
-          !weakAreas.includes(bestTopicResult.topicId)
-        ) {
-          onAutoTopicAdd(bestTopicResult.topicId);
-        }
-      }
-
-      const newQuery: SentQuery = {
-        id: `q-${Date.now()}`,
-        text: queryText,
-        topicLabel: activeTree ? topicLabel : "All Topics",
-        matches,
-        globalMatches: globalMatchesResult,
-        bestTopic: bestTopicResult,
-        crossTopicDetection,
-        timestamp: Date.now(),
-      };
-      setSentQueries((prev) => {
-        const next = [...prev, newQuery];
-        return next.length > 100 ? next.slice(-100) : next;
+    window.setTimeout(() => {
+      setLastQuery(nextQuery);
+      const previewResults = searchTopicMetadata(nextQuery, {
+        activeTopicId: activeTree?.topicId ?? null,
       });
 
-      setTimeout(() => {
-        onFreeTextChange("");
-        setTimeout(() => setIsSending(false), 200);
-      }, 80);
-    }, 400);
-  }, [
-    freeText,
-    activeTree,
-    topicLabel,
-    isSending,
-    onFreeTextChange,
-    weakAreas,
-    onAutoTopicAdd,
-  ]);
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        handleSend();
+      if (
+        previewResults.topMatch &&
+        previewResults.topMatch.score >= 70 &&
+        !weakAreas.includes(previewResults.topMatch.topicId)
+      ) {
+        onAutoTopicAdd?.(previewResults.topMatch.topicId);
       }
-    },
-    [handleSend]
-  );
 
-  const hasText = freeText.trim().length > 0;
+      setIsSearching(false);
+    }, 220);
+  }
+
+  function handleResultAction(result: TopicSearchResult) {
+    if (activeTree && result.topicId === activeTree.topicId) {
+      onSubtopicToggle(result.subtopicId);
+      return;
+    }
+
+    onGlobalMatchSelect?.(result.topicId, result.subtopicId);
+  }
 
   const placeholderText = isGlobalMode
-    ? "Describe what you\u2019re struggling with\u2026"
-    : `What feels confusing about ${topicLabel.toLowerCase()}?`;
+    ? "Search by keyword, concept, or confusion..."
+    : `Search inside ${topicLabel.toLowerCase()} or describe the weak spot...`;
+  const hasSearchResults = Boolean(lastQuery && visibleResults.length > 0);
 
   return (
     <AnimatePresence mode="wait">
@@ -465,418 +288,361 @@ export function SmartInputPanel({
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -8 }}
         transition={{ type: "spring", stiffness: 400, damping: 32, mass: 0.8 }}
-        className="flex flex-col h-full max-h-full min-h-0 rounded-2xl border border-border/60 bg-card/40 backdrop-blur-sm overflow-hidden"
+        className="flex h-full max-h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border/60 bg-card/40 backdrop-blur-sm"
       >
-        {/* ── Panel header ── */}
-        <div className="px-5 pt-5 pb-4 border-b border-border/40">
+        <div className="border-b border-border/40 px-5 pb-4 pt-5">
           <div className="flex items-center gap-3">
             <div
               className={cn(
-                "w-9 h-9 rounded-xl flex items-center justify-center shrink-0",
+                "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
                 activeTree
-                  ? "bg-surface border border-border"
-                  : "bg-accent/10 border border-accent/20"
+                  ? "border border-border bg-surface"
+                  : "border border-accent/20 bg-accent/10"
               )}
             >
-              {activeTree ? (
-                <span className="text-sm">{topicIcon}</span>
-              ) : (
-                <Search size={14} className="text-accent" />
-              )}
+              {activeTree ? <span className="text-sm">{topicIcon}</span> : <Search size={14} className="text-accent" />}
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className="text-sm font-semibold text-foreground truncate">
-                {activeTree ? topicLabel : "Smart Search"}
+              <h3 className="truncate text-sm font-semibold text-foreground">
+                {activeTree ? topicLabel : "Smart Topic Search"}
               </h3>
-              <p className="text-[11px] text-muted-foreground truncate">
+              <p className="truncate text-[11px] text-muted-foreground">
                 {activeTree
-                  ? "Describe what feels confusing"
-                  : "Type anything \u2014 we\u2019ll match it to topics"}
+                  ? "Exact, fuzzy, alias, and curriculum-term matching inside the current flow."
+                  : "Search across all topics with structured topic metadata."}
               </p>
             </div>
-            {sentQueries.length > 0 && (
-              <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-surface border border-border">
-                <MessageSquare size={10} className="text-muted-foreground" />
-                <span className="text-[10px] font-medium text-muted-foreground tabular-nums">
-                  {sentQueries.length}
-                </span>
-              </div>
-            )}
           </div>
         </div>
 
-        {/* ── Results / empty state ── */}
-        <div
-          ref={scrollRef}
-          className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 px-5 py-4"
-        >
-          {/* Empty state */}
-          {sentQueries.length === 0 && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.15 }}
-              className="flex flex-col gap-5"
-            >
-              {/* Empty illustration */}
-              <div className="flex flex-col items-center text-center py-4">
-                <motion.div
-                  animate={{ y: [0, -6, 0] }}
-                  transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                  className="w-14 h-14 rounded-2xl bg-accent/8 border border-accent/15 flex items-center justify-center mb-4"
-                >
-                  <Sparkles size={22} className="text-accent/60" />
-                </motion.div>
-                <p className="text-sm font-medium text-foreground/80 mb-1">
-                  {activeTree ? "What\u2019s tricky?" : "What are you struggling with?"}
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-4">
+          {!lastQuery && (
+            <div className="space-y-5">
+              <div className="rounded-2xl border border-accent/15 bg-accent/5 p-4 text-center">
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl border border-accent/15 bg-accent/8">
+                  <Sparkles size={20} className="text-accent/70" />
+                </div>
+                <p className="text-sm font-medium text-foreground">
+                  {activeTree ? "Search this topic with plain keywords" : "Search any topic with plain keywords"}
                 </p>
-                <p className="text-[11px] text-muted-foreground max-w-[260px]">
-                  {activeTree
-                    ? "Type a keyword or describe what confuses you and we\u2019ll find matching subtopics."
-                    : "Describe your confusion in plain English. We\u2019ll scan all topics and find what matches."}
+                <p className="mx-auto mt-2 max-w-[320px] text-[11px] leading-relaxed text-muted-foreground">
+                  Try direct words like <span className="text-foreground/80">abstraction</span>,
+                  <span className="text-foreground/80"> string</span>,
+                  <span className="text-foreground/80"> read</span>,
+                  <span className="text-foreground/80"> GDPR</span>, or describe what feels confusing.
                 </p>
               </div>
 
-              {/* Quick-start chips */}
               <div>
-                <p className="text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-widest mb-2.5">
-                  {activeTree ? "Try these keywords" : "Quick start"}
+                <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/60">
+                  Quick suggestions
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {activeTree
-                    ? activeTree.subtopics
-                        .slice(0, 4)
-                        .flatMap((s) => s.keywords.slice(0, 2))
-                        .slice(0, 6)
-                        .map((kw) => (
-                          <motion.button
-                            key={kw}
-                            whileHover={{ scale: 1.03, y: -1 }}
-                            whileTap={{ scale: 0.97 }}
-                            onClick={() =>
-                              onFreeTextChange(freeText ? `${freeText}, ${kw}` : kw)
-                            }
-                            className="px-3 py-1.5 rounded-full text-[11px] font-medium text-muted-foreground bg-surface border border-border/60 hover:border-accent/30 hover:text-foreground hover:bg-accent/5 transition-colors cursor-pointer"
-                          >
-                            {kw}
-                          </motion.button>
-                        ))
-                    : SAMPLE_QUERIES.map((sq) => (
-                        <motion.button
-                          key={sq}
-                          whileHover={{ scale: 1.03, y: -1 }}
-                          whileTap={{ scale: 0.97 }}
-                          onClick={() => onFreeTextChange(sq)}
-                          className="px-3 py-1.5 rounded-full text-[11px] font-medium text-muted-foreground bg-surface border border-border/60 hover:border-accent/30 hover:text-foreground hover:bg-accent/5 transition-colors cursor-pointer"
-                        >
-                          {sq}
-                        </motion.button>
-                      ))}
+                  {suggestedTerms.map((term) => (
+                    <button
+                      key={term}
+                      type="button"
+                      onClick={() => setQueryText(term)}
+                      className="rounded-full border border-border/60 bg-surface px-3 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:border-accent/30 hover:bg-accent/5 hover:text-foreground"
+                    >
+                      {term}
+                    </button>
+                  ))}
                 </div>
               </div>
+            </div>
+          )}
 
-              {/* Global mode topic pills */}
-              {isGlobalMode && (
-                <div>
-                  <p className="text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-widest mb-2.5">
-                    Browse by topic
+          {lastQuery && (
+            <div className="space-y-5">
+              <div className="rounded-2xl border border-border/60 bg-surface/35 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      Search Query
+                    </p>
+                    <p className="mt-2 text-sm text-foreground">{lastQuery}</p>
+                  </div>
+                  {searchResults.noDirectMatch ? (
+                    <Badge variant="warning">No exact hit</Badge>
+                  ) : (
+                    <Badge variant="success">Direct results found</Badge>
+                  )}
+                </div>
+                <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+                  {searchResults.querySummary}
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/60">
+                    Direct Matches
                   </p>
-                  <div className="flex flex-wrap gap-2">
-                    {TOPICS.slice(0, 8).map((t, i) => (
-                      <motion.button
-                        key={t.id}
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: 0.2 + i * 0.03 }}
-                        whileHover={{ scale: 1.04, y: -1 }}
-                        whileTap={{ scale: 0.96 }}
-                        onClick={() => onFreeTextChange(t.label)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium text-muted-foreground bg-surface border border-border/60 hover:border-accent/30 hover:text-foreground hover:bg-accent/5 transition-colors cursor-pointer"
-                      >
-                        <span className="text-xs">{t.icon}</span>
-                        {t.label}
-                      </motion.button>
+                  <span className="text-[10px] text-muted-foreground">
+                    {searchResults.directMatches.length}
+                  </span>
+                </div>
+                {searchResults.directMatches.length > 0 ? (
+                  <div className="space-y-3">
+                    {searchResults.directMatches.map((result) => (
+                      <MatchCard
+                        key={result.id}
+                        result={result}
+                        isActive={activeResult?.id === result.id}
+                        topicOrigin={topicOrigins[result.topicId]}
+                        onSelect={() => setActiveResultId(result.id)}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-border/50 bg-surface/25 px-4 py-3 text-xs text-muted-foreground">
+                    Nothing landed as a strong direct hit for this query yet.
+                  </div>
+                )}
+              </div>
+
+              {searchResults.relatedMatches.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/60">
+                      Related Matches
+                    </p>
+                    <span className="text-[10px] text-muted-foreground">
+                      {searchResults.relatedMatches.length}
+                    </span>
+                  </div>
+                  <div className="space-y-3">
+                    {searchResults.relatedMatches.map((result) => (
+                      <MatchCard
+                        key={result.id}
+                        result={result}
+                        isActive={activeResult?.id === result.id}
+                        topicOrigin={topicOrigins[result.topicId]}
+                        onSelect={() => setActiveResultId(result.id)}
+                      />
                     ))}
                   </div>
                 </div>
               )}
-            </motion.div>
-          )}
 
-          {/* ── Conversation thread ── */}
-          <div className="space-y-5">
-            <AnimatePresence>
-              {sentQueries.map((query) => (
-                <motion.div
-                  key={query.id}
-                  initial={{ opacity: 0, y: 14 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{
-                    type: "spring",
-                    stiffness: 380,
-                    damping: 30,
-                  }}
-                  className="space-y-3"
-                >
-                  {/* User message bubble */}
-                  <div className="flex justify-end">
-                    <div className="max-w-[80%]">
-                      <div className="bg-accent/10 border border-accent/20 rounded-2xl rounded-br-md px-4 py-3">
-                        <p className="text-[13px] text-foreground leading-relaxed break-words">
-                          {query.text}
-                        </p>
+              {searchResults.suggestedTopics.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/60">
+                      Suggested Topics
+                    </p>
+                    <span className="text-[10px] text-muted-foreground">
+                      {searchResults.suggestedTopics.length}
+                    </span>
+                  </div>
+                  <div className="space-y-3">
+                    {searchResults.suggestedTopics.map((suggestion) => (
+                      <SuggestionCard
+                        key={suggestion.topicId}
+                        suggestion={suggestion}
+                        topicOrigin={topicOrigins[suggestion.topicId]}
+                        onAdd={() => onAutoTopicAdd?.(suggestion.topicId)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {activeResult && (
+                <div className="rounded-2xl border border-accent/18 bg-accent/5 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-base">{activeResult.topicIcon}</span>
+                        <h4 className="text-sm font-semibold text-foreground">
+                          {activeResult.subtopicTitle}
+                        </h4>
+                        <Badge
+                          variant={MATCH_BADGE_VARIANTS[activeResult.matchLabel]}
+                          className="text-[10px]"
+                        >
+                          {activeResult.matchLabel}
+                        </Badge>
                       </div>
-                      <div className="flex items-center justify-end gap-1.5 mt-1 pr-1">
-                        <span className="w-1 h-1 rounded-full bg-accent/30" />
-                        <span className="text-[9px] text-muted-foreground/50">
-                          {activeTree ? topicLabel : "All Topics"}
-                        </span>
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        {activeResult.topicTitle} / {activeResult.section}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-semibold text-foreground">{activeResult.score}</p>
+                      <p className="text-[10px] text-muted-foreground">relevance</p>
+                    </div>
+                  </div>
+
+                  <p className="mt-4 text-sm leading-relaxed text-foreground/90">
+                    {activeResult.longDescription}
+                  </p>
+
+                  <div className="mt-4 grid gap-4 md:grid-cols-2">
+                    <div>
+                      <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/60">
+                        Why it was found
+                      </p>
+                      <div className="space-y-2">
+                        {activeResult.reasons.map((reason) => (
+                          <div
+                            key={reason}
+                            className="rounded-xl border border-border/60 bg-card/60 px-3 py-2 text-[11px] text-muted-foreground"
+                          >
+                            {reason}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/60">
+                        What to revise next
+                      </p>
+                      <div className="space-y-2">
+                        {activeResult.revisionPriorities.map((priority) => (
+                          <div
+                            key={priority}
+                            className="rounded-xl border border-border/60 bg-card/60 px-3 py-2 text-[11px] text-muted-foreground"
+                          >
+                            {priority}
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
 
-                  {/* Cross-topic detection */}
-                  {query.crossTopicDetection && (
-                    <motion.div
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.1 }}
-                      className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-accent/6 border border-accent/15"
-                    >
-                      <Plus size={12} className="text-accent shrink-0" />
-                      <span className="text-xs text-accent font-medium truncate">
-                        {query.crossTopicDetection.topicIcon}{" "}
-                        {query.crossTopicDetection.topicLabel}
-                      </span>
-                      <span className="text-[10px] text-accent/50 shrink-0 ml-auto">
-                        auto-added
-                      </span>
-                    </motion.div>
-                  )}
-
-                  {/* Best topic (global mode) */}
-                  {query.bestTopic && isGlobalMode && (
-                    <motion.div
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.1 }}
-                      className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-accent/6 border border-accent/15"
-                    >
-                      <Zap size={12} className="text-accent shrink-0" />
-                      <span className="text-xs text-accent font-medium truncate">
-                        {query.bestTopic.topicIcon} {query.bestTopic.topicLabel}
-                      </span>
-                      <span className="text-[10px] text-accent/50 shrink-0 ml-auto">
-                        best match
-                      </span>
-                    </motion.div>
-                  )}
-
-                  {/* Global match results */}
-                  {query.globalMatches && query.globalMatches.length > 0 && (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: 0.2 }}
-                      className="rounded-xl border border-border/60 bg-surface/40 overflow-hidden"
-                    >
-                      <div className="px-3.5 py-2 border-b border-border/40 flex items-center gap-2">
-                        <Sparkles size={10} className="text-accent" />
-                        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                          {query.globalMatches.length} match
-                          {query.globalMatches.length > 1 ? "es" : ""} found
-                        </span>
+                  <div className="mt-4 grid gap-4 md:grid-cols-2">
+                    <div>
+                      <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/60">
+                        Exam terms
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {activeResult.examVocabulary.slice(0, 8).map((term) => (
+                          <span
+                            key={term}
+                            className="rounded-full border border-border/70 bg-card/70 px-2.5 py-1 text-[10px] text-foreground/80"
+                          >
+                            {term}
+                          </span>
+                        ))}
                       </div>
-                      <div className="divide-y divide-border/30">
-                        {query.globalMatches.slice(0, 5).map((match, i) => {
-                          const style = CONFIDENCE_STYLES[match.confidence];
-                          return (
-                            <motion.button
-                              key={`${match.topicId}-${match.subtopic.id}`}
-                              initial={{ opacity: 0, x: -6 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: 0.2 + i * 0.04 }}
-                              onClick={() =>
-                                onGlobalMatchSelect?.(
-                                  match.topicId,
-                                  match.subtopic.id
-                                )
+                    </div>
+                    <div>
+                      <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/60">
+                        Related topics
+                      </p>
+                      <div className="mb-4 flex flex-wrap gap-1.5">
+                        {activeResult.relatedTopics.map((topic) => (
+                          <span
+                            key={topic.id}
+                            className="rounded-full border border-border/70 bg-card/70 px-2.5 py-1 text-[10px] text-foreground/80"
+                          >
+                            {topic.icon} {topic.title}
+                          </span>
+                        ))}
+                      </div>
+
+                      <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/60">
+                        Related subtopics
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {activeResult.relatedSubtopics.map((subtopic) => (
+                          <button
+                            key={subtopic.id}
+                            type="button"
+                            onClick={() => {
+                              const relatedResult = visibleResults.find(
+                                (result) => result.subtopicId === subtopic.id && result.topicId === activeResult.topicId
+                              );
+                              if (relatedResult) {
+                                setActiveResultId(relatedResult.id);
                               }
-                              className="w-full text-left flex items-center gap-3 px-3.5 py-2.5 hover:bg-surface/80 transition-colors cursor-pointer group"
-                            >
-                              <span className="text-sm shrink-0">
-                                {match.topicIcon}
-                              </span>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs font-medium text-foreground truncate">
-                                  {match.subtopic.label}
-                                </p>
-                                <p className="text-[10px] text-muted-foreground truncate">
-                                  {match.topicLabel}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <span
-                                  className={cn(
-                                    "w-1.5 h-1.5 rounded-full",
-                                    style.dot
-                                  )}
-                                />
-                                <span
-                                  className={cn(
-                                    "text-[9px] font-medium",
-                                    style.text
-                                  )}
-                                >
-                                  {match.confidence}
-                                </span>
-                              </div>
-                              <ArrowRight
-                                size={10}
-                                className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                              />
-                            </motion.button>
-                          );
-                        })}
+                            }}
+                            className="rounded-full border border-border/70 bg-card/70 px-2.5 py-1 text-[10px] text-foreground/80 transition-colors hover:border-accent/30 hover:text-foreground"
+                          >
+                            {subtopic.id} / {subtopic.title}
+                          </button>
+                        ))}
                       </div>
-                    </motion.div>
+                    </div>
+                  </div>
+
+                  {activeResult.weakSpots.length > 0 && (
+                    <div className="mt-4 rounded-2xl border border-warning/15 bg-warning/5 p-4">
+                      <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-warning/80">
+                        Common weak spots
+                      </p>
+                      <ul className="space-y-2">
+                        {activeResult.weakSpots.map((weakSpot) => (
+                          <li key={weakSpot} className="text-[11px] text-muted-foreground">
+                            {weakSpot}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   )}
 
-                  {/* Local match results */}
-                  {!isGlobalMode && query.matches.length > 0 && (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: 0.2 }}
-                      className="rounded-xl border border-border/60 bg-surface/40 overflow-hidden"
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <Button
+                      size="sm"
+                      onClick={() => handleResultAction(activeResult)}
                     >
-                      <div className="px-3.5 py-2 border-b border-border/40 flex items-center gap-2">
-                        <Sparkles size={10} className="text-accent" />
-                        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                          {query.matches.length} subtopic
-                          {query.matches.length > 1 ? "s" : ""} matched
-                        </span>
-                      </div>
-                      <div className="divide-y divide-border/30">
-                        {query.matches.map((match, i) => {
-                          const style = CONFIDENCE_STYLES[match.confidence];
-                          const isSelected = selectedSubtopics.includes(
-                            match.subtopic.id
-                          );
-                          return (
-                            <motion.button
-                              key={match.subtopic.id}
-                              initial={{ opacity: 0, x: -6 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: 0.2 + i * 0.04 }}
-                              onClick={() => onSubtopicToggle(match.subtopic.id)}
-                              className={cn(
-                                "w-full text-left flex items-center gap-3 px-3.5 py-2.5 transition-colors cursor-pointer group",
-                                isSelected
-                                  ? "bg-accent/5"
-                                  : "hover:bg-surface/80"
-                              )}
-                            >
-                              <div
-                                className={cn(
-                                  "w-5 h-5 rounded-md flex items-center justify-center shrink-0 text-[9px] border transition-colors",
-                                  isSelected
-                                    ? "bg-accent border-accent text-white"
-                                    : "bg-surface border-border text-muted-foreground"
-                                )}
-                              >
-                                {isSelected ? "\u2713" : match.subtopic.id.slice(-2)}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs font-medium text-foreground truncate">
-                                  {match.subtopic.label}
-                                </p>
-                                <p className="text-[10px] text-muted-foreground truncate">
-                                  {match.matchedKeywords.slice(0, 3).join(", ")}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <span
-                                  className={cn(
-                                    "w-1.5 h-1.5 rounded-full",
-                                    isSelected ? "bg-accent" : style.dot
-                                  )}
-                                />
-                                <span
-                                  className={cn(
-                                    "text-[9px] font-medium",
-                                    isSelected ? "text-accent" : style.text
-                                  )}
-                                >
-                                  {isSelected ? "selected" : match.confidence}
-                                </span>
-                              </div>
-                            </motion.button>
-                          );
-                        })}
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {/* No matches fallback */}
-                  {!isGlobalMode &&
-                    query.matches.length === 0 &&
-                    !query.crossTopicDetection && (
-                      <div className="rounded-xl border border-border/40 bg-surface/30 px-4 py-3 space-y-2">
-                        <p className="text-[11px] text-muted-foreground/60 text-center">
-                          No direct matches found
-                        </p>
-                        {getSmartSuggestions(query.text, false, activeTree)
-                          .length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 justify-center">
-                            {getSmartSuggestions(query.text, false, activeTree).map(
-                              (s) => (
-                                <button
-                                  key={s}
-                                  onClick={() => onFreeTextChange(s)}
-                                  className="px-2.5 py-1 rounded-full text-[11px] border border-border/60 hover:border-accent/30 hover:text-foreground hover:bg-accent/5 transition-all cursor-pointer text-muted-foreground"
-                                >
-                                  Try: {s}
-                                </button>
-                              )
-                            )}
-                          </div>
-                        )}
-                      </div>
+                      {activeTree && activeResult.topicId === activeTree.topicId ? (
+                        selectedSubtopics.includes(activeResult.subtopicId) ? (
+                          <>
+                            <Check size={14} />
+                            Remove from focus
+                          </>
+                        ) : (
+                          <>
+                            <Target size={14} />
+                            Add subtopic to focus
+                          </>
+                        )
+                      ) : (
+                        <>
+                          <Plus size={14} />
+                          Add topic and focus subtopic
+                        </>
+                      )}
+                    </Button>
+                    {activeResult.officialPointCodes.length > 0 && (
+                      <span className="text-[11px] text-muted-foreground">
+                        Official points: {activeResult.officialPointCodes.join(", ")}
+                      </span>
                     )}
+                  </div>
+                </div>
+              )}
 
-                  {isGlobalMode &&
-                    (!query.globalMatches ||
-                      query.globalMatches.length === 0) && (
-                      <div className="rounded-xl border border-border/40 bg-surface/30 px-4 py-3 space-y-2">
-                        <p className="text-[11px] text-muted-foreground/60 text-center">
-                          No strong matches
-                        </p>
-                        {getSmartSuggestions(query.text, true, null).length >
-                          0 && (
-                          <div className="flex flex-wrap gap-1.5 justify-center">
-                            {getSmartSuggestions(query.text, true, null).map(
-                              (s) => (
-                                <button
-                                  key={s}
-                                  onClick={() => onFreeTextChange(s)}
-                                  className="px-2.5 py-1 rounded-full text-[11px] border border-border/60 hover:border-accent/30 hover:text-foreground hover:bg-accent/5 transition-all cursor-pointer text-muted-foreground"
-                                >
-                                  {s}
-                                </button>
-                              )
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                </motion.div>
-              ))}
-            </AnimatePresence>
+              {!hasSearchResults && searchResults.suggestedTopics.length === 0 && (
+                <div className="rounded-2xl border border-border/50 bg-surface/25 px-4 py-3 text-xs text-muted-foreground">
+                  No meaningful matches yet. Try a broader keyword or one of the suggested terms above.
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="mt-5 rounded-2xl border border-border/60 bg-surface/30 p-4">
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/60">
+              {activeTree ? `Notes for ${topicLabel}` : "General focus note"}
+            </p>
+            <textarea
+              value={noteText}
+              onChange={(event) => onNoteChange(event.target.value)}
+              rows={4}
+              placeholder={
+                activeTree
+                  ? "Write what feels weak here so it is saved with this topic..."
+                  : "Add a general note about what you want to focus on..."
+              }
+              className="min-h-[110px] w-full resize-none rounded-2xl border border-border/60 bg-card/70 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
+            />
           </div>
         </div>
 
-        {/* ── Composer ── */}
         <div className="border-t border-border/40 p-4">
           <motion.div
             animate={{
@@ -888,11 +654,10 @@ export function SmartInputPanel({
                 : "none",
             }}
             transition={{ duration: 0.25 }}
-            className="relative bg-surface/60 border rounded-xl overflow-hidden"
+            className="relative overflow-hidden rounded-xl border bg-surface/60"
           >
-            {/* Top glow line */}
             <motion.div
-              className="absolute top-0 left-[10%] right-[10%] h-px pointer-events-none"
+              className="pointer-events-none absolute top-0 left-[10%] right-[10%] h-px"
               animate={{
                 opacity: isFocused ? 1 : 0,
                 scaleX: isFocused ? 1 : 0.3,
@@ -907,24 +672,27 @@ export function SmartInputPanel({
             <div className="flex items-end gap-2 p-3">
               <div className="flex-1 min-w-0">
                 <textarea
-                  ref={textareaRef}
-                  value={freeText}
-                  onChange={(e) => onFreeTextChange(e.target.value)}
+                  value={queryText}
+                  onChange={(event) => setQueryText(event.target.value)}
                   onFocus={() => setIsFocused(true)}
                   onBlur={() => setIsFocused(false)}
-                  onKeyDown={handleKeyDown}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      handleSearch();
+                    }
+                  }}
                   placeholder={placeholderText}
-                  maxLength={120}
+                  maxLength={140}
                   rows={1}
-                  className="w-full bg-transparent text-sm text-foreground resize-none placeholder:text-muted-foreground/40 focus:outline-none leading-relaxed py-1.5 px-1 min-h-[36px] break-words"
+                  className="min-h-[36px] w-full resize-none break-words bg-transparent px-1 py-1.5 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/40 focus:outline-none"
                   style={{
                     height: "auto",
-                    minHeight: "36px",
                     maxHeight: "100px",
                     overflow: "hidden",
                   }}
-                  onInput={(e) => {
-                    const target = e.target as HTMLTextAreaElement;
+                  onInput={(event) => {
+                    const target = event.target as HTMLTextAreaElement;
                     target.style.height = "auto";
                     target.style.height = `${Math.min(target.scrollHeight, 100)}px`;
                   }}
@@ -932,68 +700,37 @@ export function SmartInputPanel({
               </div>
 
               <motion.button
-                onClick={handleSend}
-                disabled={!hasText || isSending}
+                type="button"
+                onClick={handleSearch}
+                disabled={!queryText.trim() || isSearching}
                 animate={{
-                  scale: hasText ? 1 : 0.92,
-                  opacity: hasText ? 1 : 0.35,
-                  backgroundColor: hasText
+                  scale: queryText.trim() ? 1 : 0.92,
+                  opacity: queryText.trim() ? 1 : 0.35,
+                  backgroundColor: queryText.trim()
                     ? "rgb(139, 92, 246)"
                     : "rgba(139, 92, 246, 0.1)",
                 }}
-                whileHover={hasText ? { scale: 1.06 } : {}}
-                whileTap={hasText ? { scale: 0.94 } : {}}
+                whileHover={queryText.trim() ? { scale: 1.06 } : {}}
+                whileTap={queryText.trim() ? { scale: 0.94 } : {}}
                 transition={{ type: "spring", stiffness: 500, damping: 28 }}
-                className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 cursor-pointer disabled:cursor-not-allowed"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg disabled:cursor-not-allowed"
               >
-                {isSending ? (
+                {isSearching ? (
                   <motion.div
                     animate={{ rotate: 360 }}
-                    transition={{
-                      duration: 0.6,
-                      repeat: Infinity,
-                      ease: "linear",
-                    }}
+                    transition={{ duration: 0.6, repeat: Infinity, ease: "linear" }}
                   >
                     <Sparkles size={14} className="text-white" />
                   </motion.div>
                 ) : (
                   <ArrowUp
                     size={15}
-                    className={hasText ? "text-white" : "text-accent/30"}
+                    className={queryText.trim() ? "text-white" : "text-accent/30"}
                     strokeWidth={2.5}
                   />
                 )}
               </motion.button>
             </div>
-
-            {/* Bottom hint */}
-            <motion.div
-              animate={{
-                opacity: isFocused ? 1 : 0,
-                height: isFocused ? "auto" : 0,
-              }}
-              transition={{ duration: 0.2 }}
-              className="overflow-hidden"
-            >
-              <div className="px-4 pb-2 flex items-center justify-between">
-                <p className="text-[9px] text-muted-foreground/40">
-                  Enter to send
-                </p>
-                {freeText.length >= 90 && (
-                  <span
-                    className={cn(
-                      "text-[9px] tabular-nums",
-                      freeText.length >= 110
-                        ? "text-danger"
-                        : "text-muted-foreground/40"
-                    )}
-                  >
-                    {freeText.length}/120
-                  </span>
-                )}
-              </div>
-            </motion.div>
           </motion.div>
         </div>
       </motion.div>

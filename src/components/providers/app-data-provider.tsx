@@ -16,6 +16,7 @@ import {
   saveDiagnosticResult,
   saveFocusBreakdown,
   saveMaterialProgress,
+  savePracticeSetProgress,
   saveProfileNickname,
   saveWeakAreas,
   toggleSubtopicProgress,
@@ -76,6 +77,13 @@ type AppDataContextValue = {
     activityType: string;
     currentProgressPercent?: number;
     estimatedMinutes?: number;
+  }) => Promise<AppBootstrapState>;
+  trackPracticeSetProgress: (input: {
+    practiceSetId: string;
+    topicId: string;
+    title: string;
+    progressPercent: number;
+    minutesSpent?: number;
   }) => Promise<AppBootstrapState>;
 };
 
@@ -430,6 +438,27 @@ export function AppDataProvider({
     return nextState;
   }
 
+  async function updatePracticeSetProgress(input: {
+    practiceSetId: string;
+    topicId: string;
+    title: string;
+    progressPercent: number;
+    minutesSpent?: number;
+  }) {
+    if (!supabaseRef.current || !state.user) {
+      throw new Error("You need to be signed in to update practice progress.");
+    }
+
+    await savePracticeSetProgress(supabaseRef.current, state.user.id, input);
+    const nextState = await hydrate();
+
+    if (!nextState) {
+      throw new Error("Unable to refresh practice progress.");
+    }
+
+    return nextState;
+  }
+
   const value: AppDataContextValue = {
     configError,
     isConfigured: Boolean(config),
@@ -450,6 +479,7 @@ export function AppDataProvider({
     saveDiagnosticResult: updateDiagnosticResult,
     toggleSubtopicReview: updateSubtopicReview,
     trackMaterialProgress: updateMaterialProgress,
+    trackPracticeSetProgress: updatePracticeSetProgress,
   };
 
   return (

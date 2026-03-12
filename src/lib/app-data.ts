@@ -770,6 +770,60 @@ export async function saveMaterialProgress(
   });
 }
 
+export async function savePracticeSetProgress(
+  supabase: AppSupabaseClient,
+  userId: string,
+  input: {
+    practiceSetId: string;
+    topicId: string;
+    title: string;
+    progressPercent: number;
+    minutesSpent?: number;
+  }
+) {
+  const nextProgressPercent = Math.max(
+    0,
+    Math.min(100, Math.round(input.progressPercent))
+  );
+  const status = getProgressStatus(nextProgressPercent);
+  const timestamp = new Date().toISOString();
+
+  const { error } = await supabase.from("revision_progress").upsert(
+    {
+      user_id: userId,
+      topic_id: input.topicId,
+      entity_id: input.practiceSetId,
+      entity_type: "practice-set",
+      status,
+      progress_percent: nextProgressPercent,
+      last_interacted_at: timestamp,
+      completed_at: nextProgressPercent >= 100 ? timestamp : null,
+    },
+    {
+      onConflict: "user_id,topic_id,entity_id,entity_type",
+    }
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  const activityVerb =
+    nextProgressPercent >= 100 ? "Completed" : "Updated";
+
+  await logActivity(supabase, userId, {
+    type: "practice",
+    title: `${activityVerb} ${input.title}`,
+    topicId: input.topicId,
+    minutesSpent: input.minutesSpent ?? 12,
+    metadata: {
+      entityId: input.practiceSetId,
+      entityType: "practice-set",
+      progressPercent: nextProgressPercent,
+    },
+  });
+}
+
 export async function saveDiagnosticResult(
   supabase: AppSupabaseClient,
   userId: string,

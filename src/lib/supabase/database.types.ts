@@ -296,7 +296,7 @@ export interface Database {
     Views: Record<string, never>;
     Functions: Record<string, never>;
     Enums: {
-      revision_entity_type: "subtopic" | "material";
+      revision_entity_type: "subtopic" | "material" | "practice-set";
       revision_progress_status: "not-started" | "in-progress" | "completed";
     };
     CompositeTypes: Record<string, never>;

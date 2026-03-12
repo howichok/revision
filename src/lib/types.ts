@@ -106,7 +106,7 @@ export interface RevisionProgressEntry {
   id: string;
   topicId: string;
   entityId: string;
-  entityType: "subtopic" | "material";
+  entityType: "subtopic" | "material" | "practice-set";
   status: "not-started" | "in-progress" | "completed";
   progressPercent: number;
   completedAt: string | null;
@@ -243,6 +243,16 @@ export const TOPIC_TREES: TopicTree[] = [
     subtopics: [
       { id: "8.1", label: "Security risks", keywords: ["malware", "phishing", "social engineering", "brute force", "SQL injection", "DDoS", "ransomware", "insider threat", "zero-day"] },
       { id: "8.2", label: "Threat mitigation", keywords: ["encryption", "firewall", "antivirus", "authentication", "two-factor", "access control", "penetration testing", "patching", "backup"] },
+    ],
+  },
+  {
+    topicId: "esp",
+    description: "Synoptic employer-set project work: reading the brief, planning a solution, building evidence, and evaluating the final outcome.",
+    subtopics: [
+      { id: "esp.1", label: "Brief analysis", keywords: ["brief", "requirements", "client needs", "constraints", "scope", "acceptance criteria"] },
+      { id: "esp.2", label: "Planning and design", keywords: ["planning", "wireframe", "algorithm", "flowchart", "prototype", "design decisions"] },
+      { id: "esp.3", label: "Implementation evidence", keywords: ["implementation", "code evidence", "database", "testing evidence", "screenshots", "iteration"] },
+      { id: "esp.4", label: "Evaluation and justification", keywords: ["evaluation", "justification", "reflection", "improvements", "user feedback", "success criteria"] },
     ],
   },
 ];

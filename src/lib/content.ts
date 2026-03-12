@@ -20,39 +20,67 @@ import type {
   StructuredSearchResults,
   TopicContentBundle,
 } from "@/data/curriculum";
+import { findPhraseEvidence, stringSimilarity } from "./intelligence/fuzzy";
+import { normalizeText } from "./intelligence/normalize";
 import { getTopicById, TOPICS, type TopicId } from "./types";
 
 function normalizeSearchValue(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
 }
 
-function buildSearchableText(values: Array<string | undefined>) {
-  return normalizeSearchValue(values.filter(Boolean).join(" "));
-}
-
-function getQueryTokens(query: string) {
-  return normalizeSearchValue(query).split(" ").filter(Boolean);
-}
-
 function scoreTextMatch(query: string, values: Array<string | undefined>) {
-  const normalizedQuery = normalizeSearchValue(query);
-  if (!normalizedQuery) {
+  const normalizedQuery = normalizeText(query);
+  if (!normalizedQuery.normalized) {
     return 0;
   }
 
-  const searchable = buildSearchableText(values);
-  if (!searchable) {
+  const normalizedValues = values
+    .filter(Boolean)
+    .map((value) => normalizeText(value ?? ""))
+    .filter((value) => value.normalized);
+
+  if (normalizedValues.length === 0) {
     return 0;
   }
 
   let score = 0;
-  if (searchable.includes(normalizedQuery)) {
-    score += 12;
-  }
+  const queryTokens = normalizedQuery.tokens;
 
-  for (const token of getQueryTokens(query)) {
-    if (searchable.includes(token)) {
-      score += token.length > 4 ? 4 : 2;
+  for (const value of normalizedValues) {
+    if (value.normalized === normalizedQuery.normalized) {
+      score = Math.max(score, 24);
+      continue;
+    }
+
+    if (
+      value.normalized.includes(normalizedQuery.normalized) ||
+      (normalizedQuery.normalized.length > 4 &&
+        value.normalized.length >= 5 &&
+        normalizedQuery.normalized.includes(value.normalized))
+    ) {
+      score = Math.max(score, 18);
+    }
+
+    const phraseEvidence = findPhraseEvidence(value, normalizedQuery.normalized);
+    if (phraseEvidence && phraseEvidence.similarity >= 0.84) {
+      score = Math.max(score, Math.round(14 * phraseEvidence.similarity));
+    }
+
+    const similarity = stringSimilarity(normalizedQuery.normalized, value.normalized);
+    if (similarity >= 0.88) {
+      score = Math.max(score, Math.round(12 * similarity));
+    }
+
+    for (const token of queryTokens) {
+      if (value.tokens.includes(token)) {
+        score += token.length > 4 ? 5 : 3;
+        continue;
+      }
+
+      const fuzzyToken = value.tokens.some((candidate) => stringSimilarity(token, candidate) >= 0.84);
+      if (fuzzyToken) {
+        score += 2;
+      }
     }
   }
 
@@ -215,6 +243,59 @@ export function getLibraryResources() {
 
     return left.title.localeCompare(right.title);
   });
+}
+
+export function searchLibraryResources(
+  query: string,
+  options: { legacyTopicId?: string; matchedTopicIds?: string[] } = {}
+) {
+  const normalizedQuery = normalizeSearchValue(query);
+  const matchedTopicIds = options.matchedTopicIds ?? [];
+
+  return CONTENT_RESOURCES.map((resource) => {
+    const topicLabels = resource.legacyTopicIds
+      .map((topicId) => getTopicById(topicId)?.label)
+      .filter(Boolean);
+    const score =
+      scoreTextMatch(query, [
+        resource.title,
+        resource.summary,
+        resource.tags.join(" "),
+        topicLabels.join(" "),
+      ]) +
+      (options.legacyTopicId && resource.legacyTopicIds.includes(options.legacyTopicId as TopicId) ? 8 : 0) +
+      (matchedTopicIds.length > 0 &&
+      resource.legacyTopicIds.some((topicId) => matchedTopicIds.includes(topicId))
+        ? 10
+        : 0);
+
+    return {
+      resource,
+      score:
+        normalizedQuery === ""
+          ? options.legacyTopicId && resource.legacyTopicIds.includes(options.legacyTopicId as TopicId)
+            ? 1
+            : 0
+          : score,
+    };
+  })
+    .filter((entry) => {
+      if (normalizedQuery === "") {
+        return options.legacyTopicId
+          ? entry.resource.legacyTopicIds.includes(options.legacyTopicId as TopicId)
+          : true;
+      }
+
+      return entry.score > 0;
+    })
+    .sort((left, right) => {
+      if (right.score !== left.score) {
+        return right.score - left.score;
+      }
+
+      return (right.resource.year ?? 0) - (left.resource.year ?? 0);
+    })
+    .map((entry) => entry.resource);
 }
 
 export function getRecommendedMaterialCards(topicIds: string[], limit = 3): RecommendedMaterial[] {

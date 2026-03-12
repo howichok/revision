@@ -3,22 +3,43 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { FocusTopicOrigin } from "@/lib/focus-draft";
 import type { TopicTree } from "@/lib/types";
 
 interface TopicAccordionProps {
   tree: TopicTree;
   topicIcon: string;
   topicLabel: string;
+  topicOrigin?: FocusTopicOrigin;
   isOpen: boolean;
   onToggle: () => void;
   selectedSubtopics: string[];
   onSubtopicToggle: (subtopicId: string) => void;
 }
 
+const TOPIC_ORIGIN_META: Record<
+  FocusTopicOrigin,
+  { label: string; className: string }
+> = {
+  "weak-area": {
+    label: "Weak topic",
+    className: "bg-warning/10 text-warning border border-warning/20",
+  },
+  "auto-added": {
+    label: "Auto-added",
+    className: "bg-accent/10 text-accent border border-accent/20",
+  },
+  confirmed: {
+    label: "Confirmed",
+    className: "bg-success/10 text-success border border-success/20",
+  },
+};
+
 export function TopicAccordion({
   tree,
   topicIcon,
   topicLabel,
+  topicOrigin = "weak-area",
   isOpen,
   onToggle,
   selectedSubtopics,
@@ -64,6 +85,14 @@ export function TopicAccordion({
                 ? `${selectedCount} of ${totalCount} selected`
                 : `${totalCount} subtopics`}
             </p>
+            <span
+              className={cn(
+                "inline-flex items-center rounded-lg px-2 py-0.5 text-[10px] font-medium",
+                TOPIC_ORIGIN_META[topicOrigin].className
+              )}
+            >
+              {TOPIC_ORIGIN_META[topicOrigin].label}
+            </span>
             {/* Mini progress indicator */}
             {selectedCount > 0 && (
               <motion.div
