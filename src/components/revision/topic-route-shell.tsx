@@ -11,9 +11,14 @@ import { useAppData } from "@/components/providers/app-data-provider";
 import { getSubtopicProgressForTopic } from "@/lib/progress";
 import { cn } from "@/lib/utils";
 
+type NonActiveTopicLearningMode = Exclude<
+  TopicLearningMode,
+  "recall" | "exam-drill" | "answer-check" | "quiz"
+>;
+
 interface TopicRouteShellProps {
   topicId: string;
-  activeMode: TopicLearningMode;
+  activeMode: NonActiveTopicLearningMode;
   eyebrow: string;
   title: string;
   description: string;
@@ -22,15 +27,11 @@ interface TopicRouteShellProps {
 }
 
 const modeToneMap: Record<
-  TopicLearningMode,
+  NonActiveTopicLearningMode,
   { shellVariant: "navigation" | "accent" | "warning" | "support" | "success"; badgeVariant: "accent" | "warning" | "default" | "success" }
 > = {
   overview: { shellVariant: "navigation", badgeVariant: "default" },
   practice: { shellVariant: "accent", badgeVariant: "accent" },
-  recall: { shellVariant: "accent", badgeVariant: "accent" },
-  "exam-drill": { shellVariant: "warning", badgeVariant: "warning" },
-  "answer-check": { shellVariant: "success", badgeVariant: "success" },
-  quiz: { shellVariant: "accent", badgeVariant: "accent" },
   "exam-questions": { shellVariant: "warning", badgeVariant: "warning" },
   resources: { shellVariant: "support", badgeVariant: "default" },
   progress: { shellVariant: "support", badgeVariant: "success" },
@@ -66,6 +67,9 @@ export function TopicRouteShell({
   const progress = getSubtopicProgressForTopic(revisionProgress, topicId);
   const topicRoutes = getTopicRouteItems(topicId);
   const tone = modeToneMap[activeMode];
+  // Active task routes now use dedicated active-learning shells. This shell remains
+  // for non-active topic routes such as overview, practice, resources, and progress.
+  const resolvedAside = aside;
 
   return (
     <div className="space-y-6">
@@ -160,10 +164,10 @@ export function TopicRouteShell({
         </div>
       </Card>
 
-      {aside ? (
+      {resolvedAside ? (
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
           <div>{children}</div>
-          <div className="space-y-4">{aside}</div>
+          <div className="space-y-4">{resolvedAside}</div>
         </div>
       ) : (
         <div>{children}</div>

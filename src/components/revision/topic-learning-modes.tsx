@@ -1,20 +1,24 @@
 "use client";
+
 import { useState } from "react";
 import {
   AlertCircle,
-  ArrowRight,
-  BrainCircuit,
-  ClipboardList,
   Sparkles,
   Target,
 } from "lucide-react";
-import { Badge, Button, Card, ProgressBar } from "@/components/ui";
+import { Badge, Card } from "@/components/ui";
 import type {
   PracticeExamDrill,
   PracticeRecallCard,
   PracticeResourceStep,
 } from "@/lib/practice";
 import { LearningOutcomePanel } from "@/components/revision/learning-outcome-panel";
+import { ActiveLearningLayout } from "@/components/revision/active-learning/active-learning-layout";
+import { buildIndexedRailItems } from "@/components/revision/active-learning/rail-builders";
+import { TaskContextStrip } from "@/components/revision/active-learning/task-context-strip";
+import { TaskFeedbackPanel } from "@/components/revision/active-learning/task-feedback-panel";
+import { TaskPanel } from "@/components/revision/active-learning/task-panel";
+import { TaskResponsePanel } from "@/components/revision/active-learning/task-response-panel";
 
 type RecallRating = "again" | "almost" | "got-it";
 type ExamRating = "needs-work" | "ready";
@@ -60,6 +64,27 @@ function toSentenceCase(value: string) {
   }
 
   return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function getPercentTone(percent: number): "success" | "warning" | "danger" {
+  if (percent >= 70) {
+    return "success";
+  }
+
+  if (percent >= 40) {
+    return "warning";
+  }
+
+  return "danger";
+}
+
+function ErrorMessage({ message }: { message: string }) {
+  return (
+    <div className="flex items-center gap-2 rounded-xl border border-danger/20 bg-danger/10 px-3 py-2 text-sm text-danger">
+      <AlertCircle size={14} className="shrink-0" />
+      {message}
+    </div>
+  );
 }
 
 function ResourceStepCard({
@@ -162,11 +187,15 @@ export function TopicSupportResourcesCard({
 
 export function RecallPanel({
   topicId,
+  topicLabel,
+  topicIcon,
   cards,
   progressPercent,
   onComplete,
 }: {
   topicId: string;
+  topicLabel: string;
+  topicIcon: string;
   cards: PracticeRecallCard[];
   progressPercent: number;
   onComplete: (percent: number) => Promise<unknown>;
@@ -180,13 +209,39 @@ export function RecallPanel({
 
   const currentCard = cards[currentIndex] ?? null;
   const ratedCount = getRatedCount(ratings);
-  const roundPercent =
-    cards.length > 0 ? Math.round((ratedCount / cards.length) * 100) : 0;
   const masteryPercent = getAveragePercent(
     cards.map((card) => card.id),
     ratings,
     RECALL_SCORES
   );
+  const completedIndexes = cards.flatMap((card, index) =>
+    ratings[card.id] ? [index] : []
+  );
+  const railItems = buildIndexedRailItems(
+    cards.map((card) => ({
+      label: card.title,
+      description:
+        card.kind === "term"
+          ? "Recall the key term from memory."
+          : "Recall the curriculum point before revealing the answer.",
+      meta: card.kind === "term" ? "term" : "point",
+    })),
+    currentIndex,
+    completedIndexes
+  );
+  const railSummary = [
+    { label: "Progress", value: `${ratedCount}/${cards.length}`, tone: "accent" as const },
+    {
+      label: "Mastery",
+      value: `${masteryPercent}%`,
+      tone: getPercentTone(masteryPercent),
+    },
+    {
+      label: "Saved",
+      value: `${progressPercent}%`,
+      tone: progressPercent > 0 ? getPercentTone(progressPercent) : "default" as const,
+    },
+  ];
 
   async function handleRateCard(rating: RecallRating) {
     if (!currentCard) {
@@ -251,94 +306,107 @@ export function RecallPanel({
     );
   }
 
-  return (
-    <div className="space-y-5">
-      <Card variant="accent" className="p-5 sm:p-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <BrainCircuit size={15} className="text-accent" />
-              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Active Recall
-              </span>
-            </div>
-            <h3 className="mt-2 text-lg font-semibold text-foreground">
-              Recall cycle
-            </h3>
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              Recall the idea before revealing it, then rate how well you could actually bring it back without help.
-            </p>
-          </div>
-          <div className="space-y-2 text-right">
-            <Badge variant={progressPercent >= 70 ? "success" : progressPercent >= 40 ? "warning" : "default"}>
-              Saved {progressPercent}%
-            </Badge>
-            <p className="text-xs text-muted-foreground">{cards.length} cards mapped</p>
-          </div>
-        </div>
-
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
-            <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-              <span>Round progress</span>
-              <span>{roundPercent}%</span>
-            </div>
-            <ProgressBar value={roundPercent} className="mt-3" size="sm" />
-          </div>
-          <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
-            <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-              <span>Current mastery</span>
-              <span>{masteryPercent}%</span>
-            </div>
-            <ProgressBar value={masteryPercent} className="mt-3" size="sm" />
-          </div>
-        </div>
-
-        {error && (
-          <div className="mt-4 flex items-center gap-2 rounded-xl border border-danger/20 bg-danger/10 px-3 py-2 text-sm text-danger">
-            <AlertCircle size={14} className="shrink-0" />
-            {error}
+  if (sessionComplete) {
+    return (
+      <LearningOutcomePanel
+        eyebrow="Active Recall"
+        title="Recall round complete"
+        summary={`You rated ${cards.length} cards. Use the mastery signal to decide whether to move into written answers or repeat the deck.`}
+        tone={getPercentTone(masteryPercent)}
+        progressLabel="Current mastery"
+        progressValue={masteryPercent}
+        badges={[
+          {
+            label:
+              masteryPercent >= 70
+                ? "Strong recall"
+                : masteryPercent >= 40
+                  ? "Partial recall"
+                  : "Needs repetition",
+            variant: getPercentTone(masteryPercent),
+          },
+        ]}
+        primaryAction={{
+          label: "Check this topic against the mark scheme",
+          href: `/revision/${topicId}/answer-check`,
+        }}
+        secondaryAction={{
+          label: "Run the recall cycle again",
+          onClick: handleRestart,
+          variant: "secondary",
+        }}
+      >
+        {error ? (
+          <ErrorMessage message={error} />
+        ) : (
+          <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4 text-sm text-muted-foreground">
+            Use the mastery signal to decide whether you should practise a written answer next or repeat the cards that still felt weak.
           </div>
         )}
-      </Card>
+      </LearningOutcomePanel>
+    );
+  }
 
-      {!sessionComplete && currentCard ? (
-        <Card variant="task" className="p-5 sm:p-6">
-          <div className="flex items-center justify-between gap-3">
-            <Badge variant="accent">
-              Card {currentIndex + 1} / {cards.length}
+  if (!currentCard) {
+    return null;
+  }
+
+  return (
+    <ActiveLearningLayout
+      backHref={`/revision/${topicId}/practice`}
+      railTitle={`${topicLabel} recall`}
+      railSubtitle="Recall the idea first, then reveal the model answer and rate what you genuinely knew."
+      railIcon={<span className="text-lg">{topicIcon}</span>}
+      railItems={railItems}
+      railSummary={railSummary}
+      mobileSummaryLabel="Recall"
+      contextStrip={
+        <TaskContextStrip
+          eyebrow="Active recall"
+          breadcrumb={topicLabel}
+          meta={`Card ${currentIndex + 1} of ${cards.length}`}
+          status={
+            <Badge
+              variant={
+                progressPercent >= 70
+                  ? "success"
+                  : progressPercent >= 40
+                    ? "warning"
+                    : "default"
+              }
+            >
+              Saved {progressPercent}%
             </Badge>
-            <Badge variant={currentCard.kind === "term" ? "success" : "default"}>
-              {currentCard.kind === "term" ? "Term" : "Curriculum point"}
-            </Badge>
-          </div>
-
-          <h4 className="mt-4 text-xl font-semibold text-foreground">
-            {currentCard.title}
-          </h4>
-          <p className="mt-3 text-sm leading-relaxed text-foreground/90">
-            {currentCard.prompt}
-          </p>
-
-          {currentCard.hint && (
-            <p className="mt-3 text-xs text-muted-foreground">
-              Hint: {currentCard.hint}
-            </p>
-          )}
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            {currentCard.tags.slice(0, 4).map((tag) => (
-              <span
-                key={`${currentCard.id}-${tag}`}
-                className="rounded-lg border border-border bg-surface/20 px-2.5 py-1 text-[11px] text-muted-foreground"
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
-
+          }
+        />
+      }
+      task={
+        <TaskPanel title={currentCard.title} subtitle={currentCard.prompt}>
+          {currentCard.tags.length ? (
+            <div className="flex flex-wrap gap-2">
+              {currentCard.tags.slice(0, 4).map((tag) => (
+                <span
+                  key={`${currentCard.id}-${tag}`}
+                  className="rounded-full border border-white/8 bg-black/20 px-3 py-1 text-xs text-muted-foreground"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </TaskPanel>
+      }
+      response={
+        <TaskResponsePanel
+          label={revealed ? "Reveal and compare" : "Think before you reveal"}
+          description={
+            revealed
+              ? "Compare what you remembered with the model answer, then rate the quality of your recall."
+              : "Say the answer aloud or outline it briefly before you reveal the model answer."
+          }
+        >
           {revealed ? (
-            <div className="mt-5 space-y-4">
+            <div className="space-y-4">
               <div className="rounded-2xl border border-success/20 bg-success/10 px-4 py-4">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-success">
                   Model answer
@@ -346,96 +414,87 @@ export function RecallPanel({
                 <p className="mt-2 text-sm leading-relaxed text-foreground">
                   {currentCard.answer}
                 </p>
-                <p className="mt-3 text-xs text-muted-foreground">
-                  Next: {currentCard.nextStep}
-                </p>
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => void handleRateCard("again")}
-                  disabled={isSaving}
-                >
-                  Repeat this card
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => void handleRateCard("almost")}
-                  disabled={isSaving}
-                >
-                  Mostly recalled it
-                </Button>
-                <Button
-                  onClick={() => void handleRateCard("got-it")}
-                  isLoading={isSaving}
-                >
-                  I could recall this confidently
-                  <ArrowRight size={14} />
-                </Button>
+              <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Next when you review
+                </p>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                  {currentCard.nextStep}
+                </p>
               </div>
             </div>
           ) : (
-            <div className="mt-5 flex items-center justify-between gap-3">
-              <p className="text-xs text-muted-foreground">
-                Try to say the answer aloud before revealing it.
+            <div className="space-y-3 rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
+              <p className="text-sm leading-relaxed text-foreground/90">
+                Stop and retrieve the answer from memory before you reveal it. The goal is to test recall, not recognition.
               </p>
-              <Button onClick={() => setRevealed(true)}>Reveal answer</Button>
+              {currentCard.hint ? (
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  Hint: {currentCard.hint}
+                </p>
+              ) : null}
             </div>
           )}
-        </Card>
-      ) : (
-        <LearningOutcomePanel
-          eyebrow="Active Recall"
-          title="Recall round complete"
-          summary={`You rated ${cards.length} cards. Use the mastery signal to decide whether you should move into written answers or repeat the deck.`}
-          tone={
-            masteryPercent >= 70
-              ? "success"
-              : masteryPercent >= 40
-                ? "warning"
-                : "danger"
-          }
-          progressLabel="Current mastery"
-          progressValue={masteryPercent}
-          badges={[
-            {
-              label:
-                masteryPercent >= 70
-                  ? "Strong recall"
-                  : masteryPercent >= 40
-                    ? "Partial recall"
-                    : "Needs repetition",
-              variant:
-                masteryPercent >= 70
-                  ? "success"
-                  : masteryPercent >= 40
-                    ? "warning"
-                    : "danger",
-            },
-          ]}
-          primaryAction={{
-            label: "Check a written answer next",
-            href: `/revision/${topicId}/answer-check`,
-          }}
-          secondaryAction={{
-            label: "Run the recall cycle again",
-            onClick: handleRestart,
-            variant: "secondary",
-          }}
-        />
-      )}
-    </div>
+        </TaskResponsePanel>
+      }
+      feedback={
+        revealed ? (
+          <TaskFeedbackPanel
+            tone="analysis"
+            title="Rate the quality of your recall"
+            summary="Choose the option that best matches what you knew before you revealed the answer."
+          />
+        ) : undefined
+      }
+      primaryAction={
+        revealed
+          ? {
+              label: "I could recall this confidently",
+              onClick: () => void handleRateCard("got-it"),
+              loading: isSaving,
+            }
+          : {
+              label: "Reveal answer",
+              onClick: () => setRevealed(true),
+            }
+      }
+      secondaryAction={
+        revealed
+          ? {
+              label: "Mostly recalled it",
+              onClick: () => void handleRateCard("almost"),
+              disabled: isSaving,
+              variant: "secondary",
+            }
+          : undefined
+      }
+      tertiaryAction={
+        revealed
+          ? {
+              label: "Repeat this card",
+              onClick: () => void handleRateCard("again"),
+              disabled: isSaving,
+              variant: "ghost",
+            }
+          : undefined
+      }
+    />
   );
 }
 
 export function ExamDrillPanel({
   topicId,
+  topicLabel,
+  topicIcon,
   drills,
   progressPercent,
   onComplete,
 }: {
   topicId: string;
+  topicLabel: string;
+  topicIcon: string;
   drills: PracticeExamDrill[];
   progressPercent: number;
   onComplete: (percent: number) => Promise<unknown>;
@@ -450,13 +509,36 @@ export function ExamDrillPanel({
 
   const currentDrill = drills[currentIndex] ?? null;
   const ratedCount = getRatedCount(ratings);
-  const roundPercent =
-    drills.length > 0 ? Math.round((ratedCount / drills.length) * 100) : 0;
   const readinessPercent = getAveragePercent(
     drills.map((drill) => drill.id),
     ratings,
     EXAM_SCORES
   );
+  const completedIndexes = drills.flatMap((drill, index) =>
+    ratings[drill.id] ? [index] : []
+  );
+  const railItems = buildIndexedRailItems(
+    drills.map((drill, index) => ({
+      label: drill.title || `Prompt ${index + 1}`,
+      description: "Plan your answer before you reveal the checklist.",
+      meta: drill.marks ? `${drill.marks}m` : undefined,
+    })),
+    currentIndex,
+    completedIndexes
+  );
+  const railSummary = [
+    { label: "Progress", value: `${ratedCount}/${drills.length}`, tone: "accent" as const },
+    {
+      label: "Readiness",
+      value: `${readinessPercent}%`,
+      tone: getPercentTone(readinessPercent),
+    },
+    {
+      label: "Saved",
+      value: `${progressPercent}%`,
+      tone: progressPercent > 0 ? getPercentTone(progressPercent) : "default" as const,
+    },
+  ];
 
   async function handleRateDrill(rating: ExamRating) {
     if (!currentDrill) {
@@ -523,182 +605,145 @@ export function ExamDrillPanel({
     );
   }
 
-  return (
-    <div className="space-y-5">
-      <Card variant="warning" className="p-5 sm:p-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <ClipboardList size={15} className="text-warning" />
-              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Guided Exam Practice
-              </span>
-            </div>
-            <h3 className="mt-2 text-lg font-semibold text-foreground">
-              Exam drill
-            </h3>
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              This mode helps you plan and self-check exam responses. It does not produce a formal score.
-            </p>
-          </div>
-          <div className="space-y-2 text-right">
-            <Badge variant={progressPercent >= 70 ? "success" : progressPercent >= 40 ? "warning" : "default"}>
-              Saved {progressPercent}%
-            </Badge>
-            <p className="text-xs text-muted-foreground">{drills.length} exam prompts mapped</p>
-          </div>
-        </div>
-
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
-            <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-              <span>Round progress</span>
-              <span>{roundPercent}%</span>
-            </div>
-            <ProgressBar value={roundPercent} className="mt-3" size="sm" />
-          </div>
-          <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
-            <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-              <span>Readiness signal</span>
-              <span>{readinessPercent}%</span>
-            </div>
-            <ProgressBar value={readinessPercent} className="mt-3" size="sm" />
-          </div>
-        </div>
-
-        {error && (
-          <div className="mt-4 flex items-center gap-2 rounded-xl border border-danger/20 bg-danger/10 px-3 py-2 text-sm text-danger">
-            <AlertCircle size={14} className="shrink-0" />
-            {error}
+  if (sessionComplete) {
+    return (
+      <LearningOutcomePanel
+        eyebrow="Guided Exam Practice"
+        title="Exam drill round complete"
+        summary={`You worked through ${drills.length} exam prompts. Use the readiness signal to decide whether to move into answer checking or repeat more guided planning.`}
+        tone={getPercentTone(readinessPercent)}
+        progressLabel="Readiness signal"
+        progressValue={readinessPercent}
+        badges={[
+          {
+            label:
+              readinessPercent >= 70
+                ? "Ready for exam wording"
+                : readinessPercent >= 40
+                  ? "Some gaps remain"
+                  : "Needs guided review",
+            variant: getPercentTone(readinessPercent),
+          },
+        ]}
+        primaryAction={{
+          label: "Check this topic against the mark scheme",
+          href: `/revision/${topicId}/answer-check`,
+        }}
+        secondaryAction={{
+          label: "Run another exam drill round",
+          onClick: handleRestart,
+          variant: "secondary",
+        }}
+      >
+        {error ? (
+          <ErrorMessage message={error} />
+        ) : (
+          <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4 text-sm text-muted-foreground">
+            Use the readiness signal to decide whether to move into rubric-based answer checking or spend another round planning exam responses.
           </div>
         )}
-      </Card>
+      </LearningOutcomePanel>
+    );
+  }
 
-      {!sessionComplete && currentDrill ? (
-        <Card variant="task" className="p-5 sm:p-6">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="accent">
-              Prompt {currentIndex + 1} / {drills.length}
-            </Badge>
-            <Badge variant="default">{currentDrill.sourceLabel}</Badge>
-            {currentDrill.marks && (
-              <Badge variant="warning">{currentDrill.marks} marks</Badge>
-            )}
-          </div>
+  if (!currentDrill) {
+    return null;
+  }
 
-          <h4 className="mt-4 text-lg font-semibold text-foreground">
-            {currentDrill.title}
-          </h4>
-          <p className="mt-3 text-sm leading-relaxed text-foreground/90">
-            {currentDrill.prompt}
-          </p>
-
-          <div className="mt-4 rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Plan before you compare
-            </p>
-            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-              Outline the structure you would use, the key ideas to include, and one example or consequence you would mention.
-            </p>
-            <textarea
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-              rows={5}
-              placeholder="Plan your answer here..."
-              className="mt-3 w-full rounded-2xl border border-border bg-card/60 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/30"
-            />
-          </div>
-
-          {showChecklist ? (
-            <div className="mt-4 space-y-4">
+  return (
+    <ActiveLearningLayout
+      backHref={`/revision/${topicId}/practice`}
+      railTitle={`${topicLabel} exam drill`}
+      railSubtitle="Plan the answer first, then compare it with the checklist and decide whether you are ready for exam wording."
+      railIcon={<span className="text-lg">{topicIcon}</span>}
+      railItems={railItems}
+      railSummary={railSummary}
+      mobileSummaryLabel="Exam drill"
+      contextStrip={
+        <TaskContextStrip
+          eyebrow="Guided exam practice"
+          breadcrumb={topicLabel}
+          meta={`Prompt ${currentIndex + 1} of ${drills.length}`}
+          status={
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Badge variant="default">{currentDrill.sourceLabel}</Badge>
+              {currentDrill.marks ? (
+                <Badge variant="warning">{currentDrill.marks} marks</Badge>
+              ) : null}
+            </div>
+          }
+        />
+      }
+      task={
+        <TaskPanel title={currentDrill.title} subtitle={currentDrill.prompt} />
+      }
+      response={
+        <TaskResponsePanel
+          label="Plan your answer"
+          description="Outline the structure you would use, the key ideas to include, and one example or consequence you would mention before you compare it with the checklist."
+        >
+          <textarea
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+            rows={6}
+            placeholder="Plan your answer here..."
+            className="w-full rounded-2xl border border-border bg-card/60 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/30"
+          />
+        </TaskResponsePanel>
+      }
+      feedback={
+        showChecklist ? (
+          <TaskFeedbackPanel
+            tone="analysis"
+            title="Mark-scheme checklist"
+            summary="Use the checklist to self-check your plan. This route helps with planning and self-assessment; it does not give a formal score."
+          >
+            <div className="space-y-4">
               <div className="rounded-2xl border border-success/20 bg-success/10 px-4 py-4">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-success">
-                  Mark-scheme checklist
+                  Answer focus
                 </p>
                 <p className="mt-2 text-sm leading-relaxed text-foreground">
                   {currentDrill.answerFocus}
                 </p>
-                <div className="mt-4 space-y-2">
-                  {currentDrill.checklist.map((item) => (
-                    <div
-                      key={`${currentDrill.id}-${item}`}
-                      className="rounded-xl border border-border bg-card/60 px-3 py-2.5 text-xs text-foreground/90"
-                    >
-                      {toSentenceCase(item)}
-                    </div>
-                  ))}
-                </div>
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => void handleRateDrill("needs-work")}
-                  disabled={isSaving}
-                >
-                  Review feedback and retry this prompt
-                </Button>
-                <Button
-                  onClick={() => void handleRateDrill("ready")}
-                  isLoading={isSaving}
-                >
-                  Continue to next exam prompt
-                  <ArrowRight size={14} />
-                </Button>
+              <div className="space-y-2">
+                {currentDrill.checklist.map((item) => (
+                  <div
+                    key={`${currentDrill.id}-${item}`}
+                    className="rounded-xl border border-white/8 bg-black/20 px-3 py-3 text-sm text-foreground/90"
+                  >
+                    {toSentenceCase(item)}
+                  </div>
+                ))}
               </div>
             </div>
-          ) : (
-            <div className="mt-4 flex items-center justify-between gap-3">
-              <p className="text-xs text-muted-foreground">
-                Use the checklist only after you have planned the answer yourself.
-              </p>
-              <Button onClick={() => setShowChecklist(true)}>
-                Show mark-scheme checklist
-              </Button>
-            </div>
-          )}
-        </Card>
-      ) : (
-        <LearningOutcomePanel
-          eyebrow="Guided Exam Practice"
-          title="Exam drill round complete"
-          summary={`You worked through ${drills.length} exam prompts. Use the readiness signal to decide whether to move into answer checking or repeat more guided planning.`}
-          tone={
-            readinessPercent >= 70
-              ? "success"
-              : readinessPercent >= 40
-                ? "warning"
-                : "danger"
-          }
-          progressLabel="Readiness signal"
-          progressValue={readinessPercent}
-          badges={[
-            {
-              label:
-                readinessPercent >= 70
-                  ? "Ready for exam wording"
-                  : readinessPercent >= 40
-                    ? "Some gaps remain"
-                    : "Needs guided review",
-              variant:
-                readinessPercent >= 70
-                  ? "success"
-                  : readinessPercent >= 40
-                    ? "warning"
-                    : "danger",
-            },
-          ]}
-          primaryAction={{
-            label: "Check this topic against the mark scheme",
-            href: `/revision/${topicId}/answer-check`,
-          }}
-          secondaryAction={{
-            label: "Run another exam drill round",
-            onClick: handleRestart,
-            variant: "secondary",
-          }}
-        />
-      )}
-    </div>
+          </TaskFeedbackPanel>
+        ) : undefined
+      }
+      primaryAction={
+        showChecklist
+          ? {
+              label: "Continue to next exam prompt",
+              onClick: () => void handleRateDrill("ready"),
+              loading: isSaving,
+            }
+          : {
+              label: "Show mark-scheme checklist",
+              onClick: () => setShowChecklist(true),
+            }
+      }
+      secondaryAction={
+        showChecklist
+          ? {
+              label: "Mark for another round",
+              onClick: () => void handleRateDrill("needs-work"),
+              disabled: isSaving,
+              variant: "secondary",
+            }
+          : undefined
+      }
+    />
   );
 }
