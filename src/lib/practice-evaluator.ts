@@ -299,7 +299,10 @@ function buildSlotFeedback(
   profile: QuestionEvaluationProfile | undefined
 ) {
   const matchedText = evaluation.matchedSlots.slice(0, 2).join(" and ");
-  const partialText = evaluation.partialSlots.slice(0, 2).join(" and ");
+  const partialSlotFeedback = slots
+    .filter((slot) => evaluation.partialSlots.includes(slot.label))
+    .slice(0, 2)
+    .map((slot) => slot.missingFeedback);
   const missingSlotFeedback = slots
     .filter((slot) => evaluation.missingSlots.includes(slot.label))
     .slice(0, 2)
@@ -312,7 +315,7 @@ function buildSlotFeedback(
   } else if (evaluation.score >= evaluation.maxScore * 0.55) {
     parts.push("This answer is mostly correct and covers most of the important ideas.");
   } else if (evaluation.score > 0) {
-    parts.push("This answer has some correct ideas, but it is still underdeveloped.");
+    parts.push("This answer has some correct ideas, but it is still underdeveloped or too thin in places.");
   } else {
     parts.push("This answer does not yet cover the key marking points clearly enough.");
   }
@@ -321,8 +324,8 @@ function buildSlotFeedback(
     parts.push(`You clearly covered ${matchedText}.`);
   }
 
-  if (partialText) {
-    parts.push(`Develop ${partialText} more explicitly to secure more marks.`);
+  if (partialSlotFeedback.length > 0) {
+    parts.push(partialSlotFeedback.join(" "));
   }
 
   if (missingSlotFeedback.length > 0) {

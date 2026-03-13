@@ -1,8 +1,10 @@
 import {
   CONTENT_RESOURCES,
   CONTENT_SOURCES,
+  DIGITAL_SOFTWARE_DEVELOPMENT_QUALIFICATION,
   DSD_CURRICULUM_AREAS,
   DSD_CURRICULUM_POINTS,
+  DSD_EXAM_GUIDE_2026,
   GLOSSARY_TERMS,
   LEGACY_TOPIC_MAPPINGS,
   MARK_SCHEME_CONCEPTS,
@@ -13,8 +15,10 @@ import type {
   ContentSource,
   CurriculumArea,
   CurriculumPoint,
+  ExamGuide,
   GlossaryTerm,
   LegacyTopicMapping,
+  QualificationOverview,
   QuestionMetadata,
   RecommendedMaterial,
   StructuredSearchResults,
@@ -26,6 +30,10 @@ import { getTopicById, TOPICS, type TopicId } from "./types";
 
 function normalizeSearchValue(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function isExternalPath(path: string) {
+  return /^https?:\/\//i.test(path);
 }
 
 function scoreTextMatch(query: string, values: Array<string | undefined>) {
@@ -161,6 +169,14 @@ export function getSourceInventory(): ContentSource[] {
   return CONTENT_SOURCES;
 }
 
+export function getQualificationOverview(): QualificationOverview {
+  return DIGITAL_SOFTWARE_DEVELOPMENT_QUALIFICATION;
+}
+
+export function getExamGuide2026(): ExamGuide {
+  return DSD_EXAM_GUIDE_2026;
+}
+
 export function getCanonicalCurriculumAreas(): CurriculumArea[] {
   return DSD_CURRICULUM_AREAS;
 }
@@ -237,12 +253,37 @@ export function getTopicContentBundle(topicId: string): TopicContentBundle {
 
 export function getLibraryResources() {
   return [...CONTENT_RESOURCES].sort((left, right) => {
+    const leftOfficial = isExternalPath(left.filePath) ? 1 : 0;
+    const rightOfficial = isExternalPath(right.filePath) ? 1 : 0;
+
+    if (rightOfficial !== leftOfficial) {
+      return rightOfficial - leftOfficial;
+    }
+
     if ((right.year ?? 0) !== (left.year ?? 0)) {
       return (right.year ?? 0) - (left.year ?? 0);
     }
 
     return left.title.localeCompare(right.title);
   });
+}
+
+export function getOfficialGuidanceResources(limit?: number) {
+  const resources = CONTENT_RESOURCES.filter(
+    (resource) =>
+      isExternalPath(resource.filePath) &&
+      resource.tags.some((tag) => ["official", "pearson", "t levels", "student guide", "support"].includes(tag))
+  ).sort((left, right) => (right.year ?? 0) - (left.year ?? 0));
+
+  return typeof limit === "number" ? resources.slice(0, limit) : resources;
+}
+
+export function getResourceHref(resource: ContentResource) {
+  return isExternalPath(resource.filePath) ? resource.filePath : undefined;
+}
+
+export function isResourceExternal(resource: ContentResource) {
+  return isExternalPath(resource.filePath);
 }
 
 export function searchLibraryResources(

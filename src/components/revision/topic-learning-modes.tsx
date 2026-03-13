@@ -112,7 +112,7 @@ export function TopicSupportResourcesCard({
   resourceSteps: PracticeResourceStep[];
 }) {
   return (
-    <Card className="p-5 sm:p-6">
+    <Card variant="support" className="p-5 sm:p-6">
       <div className="flex items-center gap-2">
         <Sparkles size={15} className="text-accent" />
         <h3 className="text-sm font-semibold text-foreground">{title}</h3>
@@ -253,7 +253,7 @@ export function RecallPanel({
 
   return (
     <div className="space-y-5">
-      <Card className="p-5 sm:p-6">
+      <Card variant="accent" className="p-5 sm:p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="flex items-center gap-2">
@@ -278,14 +278,14 @@ export function RecallPanel({
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <div className="rounded-2xl border border-border bg-surface/30 px-4 py-3">
+          <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
             <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
               <span>Round progress</span>
               <span>{roundPercent}%</span>
             </div>
             <ProgressBar value={roundPercent} className="mt-3" size="sm" />
           </div>
-          <div className="rounded-2xl border border-border bg-surface/30 px-4 py-3">
+          <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
             <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
               <span>Current mastery</span>
               <span>{masteryPercent}%</span>
@@ -303,7 +303,7 @@ export function RecallPanel({
       </Card>
 
       {!sessionComplete && currentCard ? (
-        <Card className="p-5 sm:p-6">
+        <Card variant="task" className="p-5 sm:p-6">
           <div className="flex items-center justify-between gap-3">
             <Badge variant="accent">
               Card {currentIndex + 1} / {cards.length}
@@ -525,7 +525,7 @@ export function ExamDrillPanel({
 
   return (
     <div className="space-y-5">
-      <Card className="p-5 sm:p-6">
+      <Card variant="warning" className="p-5 sm:p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="flex items-center gap-2">
@@ -550,14 +550,14 @@ export function ExamDrillPanel({
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <div className="rounded-2xl border border-border bg-surface/30 px-4 py-3">
+          <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
             <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
               <span>Round progress</span>
               <span>{roundPercent}%</span>
             </div>
             <ProgressBar value={roundPercent} className="mt-3" size="sm" />
           </div>
-          <div className="rounded-2xl border border-border bg-surface/30 px-4 py-3">
+          <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
             <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
               <span>Readiness signal</span>
               <span>{readinessPercent}%</span>
@@ -575,7 +575,7 @@ export function ExamDrillPanel({
       </Card>
 
       {!sessionComplete && currentDrill ? (
-        <Card className="p-5 sm:p-6">
+        <Card variant="task" className="p-5 sm:p-6">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="accent">
               Prompt {currentIndex + 1} / {drills.length}
@@ -593,7 +593,7 @@ export function ExamDrillPanel({
             {currentDrill.prompt}
           </p>
 
-          <div className="mt-4 rounded-2xl border border-border bg-surface/20 px-4 py-3">
+          <div className="mt-4 rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
               Plan before you compare
             </p>

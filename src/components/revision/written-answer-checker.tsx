@@ -9,13 +9,25 @@ import {
   Sparkles,
   Target,
 } from "lucide-react";
-import { Badge, Button, ProgressBar } from "@/components/ui";
+import { Badge, Button, Card, ProgressBar } from "@/components/ui";
 import { getPracticeQuestionForTopic } from "@/lib/intelligence/catalog";
 import type { RevisionAnswerEvaluation } from "@/lib/intelligence/types";
 
 interface WrittenAnswerCheckerProps {
   topicId: string;
   topicLabel: string;
+}
+
+function getScoreTone(scorePercent: number) {
+  if (scorePercent >= 70) {
+    return "success" as const;
+  }
+
+  if (scorePercent >= 40) {
+    return "warning" as const;
+  }
+
+  return "danger" as const;
 }
 
 export function WrittenAnswerChecker({
@@ -82,9 +94,12 @@ export function WrittenAnswerChecker({
 
   if (!question) {
     return (
-      <div className="text-center py-12">
-        <ClipboardList size={40} className="text-muted-foreground mx-auto mb-3 opacity-50" />
-        <p className="text-sm text-muted-foreground mb-2">
+      <div className="py-12 text-center">
+        <ClipboardList
+          size={40}
+          className="mx-auto mb-3 text-muted-foreground opacity-50"
+        />
+        <p className="mb-2 text-sm text-muted-foreground">
           Structured written checks are being prepared for {topicLabel}.
         </p>
         <p className="text-xs text-muted-foreground/70">
@@ -97,10 +112,11 @@ export function WrittenAnswerChecker({
   const scorePercent = result
     ? Math.round((result.score / result.maxScore) * 100)
     : 0;
+  const scoreTone = getScoreTone(scorePercent);
 
   return (
     <div className="space-y-5">
-      <div className="rounded-2xl border border-border bg-surface/30 p-5">
+      <Card variant="task" className="p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
@@ -109,7 +125,7 @@ export function WrittenAnswerChecker({
                 Structured Answer Check
               </span>
             </div>
-            <h3 className="text-base font-semibold text-foreground leading-relaxed">
+            <h3 className="text-base font-semibold leading-relaxed text-foreground">
               {question.prompt}
             </h3>
             <p className="text-xs text-muted-foreground">
@@ -123,15 +139,15 @@ export function WrittenAnswerChecker({
           {question.rubricSummary.map((point) => (
             <div
               key={point}
-              className="rounded-xl border border-border bg-card/60 px-3 py-3 text-xs text-muted-foreground leading-relaxed"
+              className="rounded-xl border border-white/8 bg-black/20 px-3 py-3 text-xs leading-relaxed text-muted-foreground"
             >
               {point}
             </div>
           ))}
         </div>
-      </div>
+      </Card>
 
-      <div className="rounded-2xl border border-border bg-card/70 p-4">
+      <Card variant="input" className="p-4">
         <label
           htmlFor={`written-answer-${question.id}`}
           className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground"
@@ -173,44 +189,88 @@ export function WrittenAnswerChecker({
             </p>
           </div>
           <Button onClick={() => void handleEvaluate()} isLoading={isLoading}>
-            {result ? "Re-check answer" : "Check answer"}
+            {result
+              ? "Check this answer again"
+              : "Check this answer against the mark scheme"}
           </Button>
         </div>
-      </div>
+      </Card>
 
       {result && (
-        <div className="space-y-4 rounded-2xl border border-border bg-surface/20 p-5">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 size={15} className="text-success" />
-                <span className="text-sm font-semibold text-foreground">
-                  Score {result.score}/{result.maxScore}
-                </span>
-                <Badge variant={scorePercent >= 70 ? "success" : scorePercent >= 40 ? "warning" : "danger"}>
-                  {scorePercent}%
-                </Badge>
+        <div className="space-y-4">
+          <Card variant={scoreTone} className="p-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2
+                    size={15}
+                    className={
+                      scoreTone === "success"
+                        ? "text-success"
+                        : scoreTone === "warning"
+                          ? "text-warning"
+                          : "text-danger"
+                    }
+                  />
+                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    Analytical result
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-2xl font-semibold text-foreground">
+                    Score {result.score}/{result.maxScore}
+                  </span>
+                  <Badge variant={scoreTone}>{scorePercent}%</Badge>
+                </div>
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  {result.feedback}
+                </p>
               </div>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                {result.feedback}
-              </p>
-            </div>
-            <div className="min-w-[180px] space-y-2">
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>Confidence</span>
-                <span>{Math.round(result.confidence * 100)}%</span>
+
+              <div className="grid min-w-[220px] gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    Confidence
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold text-foreground">
+                    {Math.round(result.confidence * 100)}%
+                  </p>
+                  <ProgressBar
+                    value={Math.round(result.confidence * 100)}
+                    size="sm"
+                    className="mt-3"
+                    color={
+                      scoreTone === "danger"
+                        ? "danger"
+                        : scoreTone === "warning"
+                          ? "warning"
+                          : "success"
+                    }
+                  />
+                </div>
+
+                <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    Mark-scheme coverage
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold text-foreground">
+                    {result.matchedConcepts.length}/{result.conceptBreakdown.length}
+                  </p>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    concepts clearly matched
+                  </p>
+                </div>
               </div>
-              <ProgressBar value={Math.round(result.confidence * 100)} size="sm" />
             </div>
-          </div>
+          </Card>
 
           <div className="grid gap-4 lg:grid-cols-3">
-            <div className="space-y-2">
+            <Card variant="success" className="p-4">
               <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 <Sparkles size={12} className="text-success" />
-                Matched Concepts
+                Matched concepts
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="mt-3 flex flex-wrap gap-2">
                 {result.matchedConcepts.length ? (
                   result.matchedConcepts.map((concept) => (
                     <Badge key={concept} variant="success">
@@ -218,17 +278,19 @@ export function WrittenAnswerChecker({
                     </Badge>
                   ))
                 ) : (
-                  <span className="text-xs text-muted-foreground">No clear mark-scheme matches yet.</span>
+                  <span className="text-xs text-muted-foreground">
+                    No clear mark-scheme matches yet.
+                  </span>
                 )}
               </div>
-            </div>
+            </Card>
 
-            <div className="space-y-2">
+            <Card variant="warning" className="p-4">
               <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 <Target size={12} className="text-warning" />
-                Missing Concepts
+                Still missing
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="mt-3 flex flex-wrap gap-2">
                 {result.missingConcepts.length ? (
                   result.missingConcepts.map((concept) => (
                     <Badge key={concept} variant="warning">
@@ -236,17 +298,27 @@ export function WrittenAnswerChecker({
                     </Badge>
                   ))
                 ) : (
-                  <span className="text-xs text-muted-foreground">No major gaps detected.</span>
+                  <span className="text-xs text-muted-foreground">
+                    No major gaps detected.
+                  </span>
                 )}
               </div>
-            </div>
+            </Card>
 
-            <div className="space-y-2">
+            <Card
+              variant={result.misconceptions.length ? "danger" : "support"}
+              className="p-4"
+            >
               <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                <AlertCircle size={12} className="text-danger" />
+                <AlertCircle
+                  size={12}
+                  className={
+                    result.misconceptions.length ? "text-danger" : "text-muted-foreground"
+                  }
+                />
                 Misconceptions
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="mt-3 flex flex-wrap gap-2">
                 {result.misconceptions.length ? (
                   result.misconceptions.map((item) => (
                     <Badge key={item} variant="danger">
@@ -254,37 +326,109 @@ export function WrittenAnswerChecker({
                     </Badge>
                   ))
                 ) : (
-                  <span className="text-xs text-muted-foreground">No flagged misconception signals.</span>
+                  <span className="text-xs text-muted-foreground">
+                    No flagged misconception signals.
+                  </span>
                 )}
               </div>
-            </div>
+            </Card>
           </div>
 
-          <div className="space-y-2">
-            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Concept Breakdown
+          <Card variant="support" className="p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Concept breakdown
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  See how each marking idea was scored instead of treating the result like one opaque number.
+                </p>
+              </div>
+              <Badge variant="default">{result.conceptBreakdown.length} concepts</Badge>
             </div>
-            <div className="space-y-2">
-              {result.conceptBreakdown.map((concept) => (
-                <div
-                  key={concept.id}
-                  className="rounded-xl border border-border bg-card/60 px-4 py-3"
-                >
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{concept.label}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {concept.scoreAwarded}/{concept.maxScore} marks
-                      </p>
+
+            <div className="mt-4 space-y-3">
+              {result.conceptBreakdown.map((concept) => {
+                const tone =
+                  concept.coverage >= 0.9
+                    ? "success"
+                    : concept.coverage > 0
+                      ? "warning"
+                      : "danger";
+
+                return (
+                  <Card key={concept.id} variant={tone} className="px-4 py-4">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">
+                            {concept.label}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {concept.scoreAwarded}/{concept.maxScore} marks
+                          </p>
+                        </div>
+
+                        {concept.matchedEvidence.length > 0 && (
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                              Evidence found
+                            </p>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {concept.matchedEvidence.map((evidence) => (
+                                <span
+                                  key={`${concept.id}-${evidence}`}
+                                  className="rounded-lg border border-white/8 bg-black/20 px-2.5 py-1 text-[11px] text-foreground/90"
+                                >
+                                  {evidence}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {concept.missingEvidence.length > 0 && (
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                              Still missing
+                            </p>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {concept.missingEvidence.slice(0, 3).map((evidence) => (
+                                <span
+                                  key={`${concept.id}-missing-${evidence}`}
+                                  className="rounded-lg border border-white/8 bg-black/20 px-2.5 py-1 text-[11px] text-muted-foreground"
+                                >
+                                  {evidence}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="min-w-[180px] space-y-2">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>Coverage</span>
+                          <span>{Math.round(concept.coverage * 100)}%</span>
+                        </div>
+                        <ProgressBar
+                          value={Math.round(concept.coverage * 100)}
+                          size="sm"
+                          color={
+                            tone === "danger"
+                              ? "danger"
+                              : tone === "warning"
+                                ? "warning"
+                                : "success"
+                          }
+                        />
+                      </div>
                     </div>
-                    <div className="min-w-[160px]">
-                      <ProgressBar value={Math.round(concept.coverage * 100)} size="sm" />
-                    </div>
-                  </div>
-                </div>
-              ))}
+                  </Card>
+                );
+              })}
             </div>
-          </div>
+          </Card>
         </div>
       )}
     </div>

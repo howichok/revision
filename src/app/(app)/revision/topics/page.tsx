@@ -26,7 +26,7 @@ export default function RevisionTopicsPage() {
       <div className="space-y-6">
         <RevisionSubnav activeRoute="topics" />
 
-        <div>
+        <Card variant="navigation" className="p-5 sm:p-6">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Practice by topic
           </p>
@@ -37,7 +37,7 @@ export default function RevisionTopicsPage() {
             Use this route when you already know which topic you want to revise. Each topic now has
             its own overview, practice hub, recall mode, exam drill, answer checker, quiz, resources, and progress page.
           </p>
-        </div>
+        </Card>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {topics.map((topic) => {
@@ -63,7 +63,7 @@ export default function RevisionTopicsPage() {
             );
 
             return (
-              <Card key={topic.id} className="h-full p-5">
+              <Card key={topic.id} variant="navigation" className="h-full p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-3">
                     <div className="flex items-center gap-3">
@@ -89,7 +89,7 @@ export default function RevisionTopicsPage() {
                 </div>
 
                 <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-xl border border-border bg-surface/30 px-3 py-3">
+                  <div className="surface-cutout rounded-xl px-3 py-3">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                       Topic progress
                     </p>
@@ -98,7 +98,7 @@ export default function RevisionTopicsPage() {
                     </p>
                     <ProgressBar value={topicProgress.progressPercent} className="mt-3" size="sm" />
                   </div>
-                  <div className="rounded-xl border border-border bg-surface/30 px-3 py-3">
+                  <div className="surface-cutout rounded-xl px-3 py-3">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                       Quick quiz progress
                     </p>
@@ -110,7 +110,10 @@ export default function RevisionTopicsPage() {
                 <div className="mt-4 flex flex-wrap gap-2">
                   {mappedPapers.length > 0 ? (
                     mappedPapers.map((paper) => (
-                      <Badge key={`${topic.id}-${paper}`} variant="accent">
+                      <Badge
+                        key={`${topic.id}-${paper}`}
+                        variant={paper === "Paper 1" ? "paper-1" : "paper-2"}
+                      >
                         {paper}
                       </Badge>
                     ))
@@ -143,4 +146,3 @@ export default function RevisionTopicsPage() {
     </PageContainer>
   );
 }
-

@@ -69,9 +69,19 @@ export function LearningOutcomePanel({
   children,
 }: LearningOutcomePanelProps) {
   const Icon = toneMeta[tone].icon;
+  const cardVariant =
+    tone === "success"
+      ? "success"
+      : tone === "warning"
+        ? "warning"
+        : tone === "danger"
+          ? "danger"
+          : tone === "accent"
+            ? "accent"
+            : "task";
 
   return (
-    <Card className="p-5 sm:p-6">
+    <Card variant={cardVariant} className="p-5 sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           {eyebrow && (
@@ -100,7 +110,7 @@ export function LearningOutcomePanel({
       </div>
 
       {typeof progressValue === "number" && progressLabel && (
-        <div className="mt-4 rounded-2xl border border-border bg-surface/30 px-4 py-3">
+        <div className="mt-4 rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>{progressLabel}</span>
             <span>{progressValue}%</span>
@@ -120,4 +130,3 @@ export function LearningOutcomePanel({
     </Card>
   );
 }
-

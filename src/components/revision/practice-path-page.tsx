@@ -8,6 +8,11 @@ import { PageContainer } from "@/components/layout/page-container";
 import { RevisionSubnav } from "@/components/revision/revision-subnav";
 import { Badge, Button, Card } from "@/components/ui";
 import {
+  getExamGuide2026,
+  getOfficialGuidanceResources,
+  getQualificationOverview,
+} from "@/lib/content";
+import {
   getPaperPracticeBundle,
   getPracticePathSummary,
   type PracticePathId,
@@ -19,9 +24,52 @@ interface PracticePathPageProps {
   pathId: PracticePathId;
 }
 
+function getPathVisualMeta(pathId: PracticePathId) {
+  if (pathId === "paper-1") {
+    return {
+      cardVariant: "paper-1" as const,
+      badgeVariant: "paper-1" as const,
+      routeLabel: "Paper 1 workflow",
+      routeFocus: "Theory recall, terminology, and shorter exam-style knowledge checks.",
+      nextStep:
+        "After this route, move into a topic answer-check or topic recall if one theory area still feels weak.",
+    };
+  }
+
+  if (pathId === "paper-2") {
+    return {
+      cardVariant: "paper-2" as const,
+      badgeVariant: "paper-2" as const,
+      routeLabel: "Paper 2 workflow",
+      routeFocus: "Applied scenarios, written reasoning, and practical design choices.",
+      nextStep:
+        "After this route, move into answer checking or topic exam drills to tighten written explanations.",
+    };
+  }
+
+  return {
+    cardVariant: "accent" as const,
+    badgeVariant: "accent" as const,
+    routeLabel: "Mixed route",
+    routeFocus: "Broad retrieval before you commit to one paper or one topic.",
+    nextStep:
+      "After this route, narrow down into Paper 1, Paper 2, or one topic with a lower score.",
+  };
+}
+
 export function PracticePathPage({ pathId }: PracticePathPageProps) {
   const [quizStarted, setQuizStarted] = useState(false);
   const summary = getPracticePathSummary(pathId);
+  const routeMeta = getPathVisualMeta(pathId);
+  const examGuide2026 = getExamGuide2026();
+  const qualificationOverview = getQualificationOverview();
+  const officialResources = getOfficialGuidanceResources(3);
+  const examEntry =
+    pathId === "paper-1"
+      ? examGuide2026.entries.find((entry) => entry.id === "summer-2026-paper-1")
+      : pathId === "paper-2"
+        ? examGuide2026.entries.find((entry) => entry.id === "summer-2026-paper-2")
+        : null;
   const paperBundle =
     pathId === "mixed" ? null : getPaperPracticeBundle(pathId);
   const relatedTopics = useMemo(
@@ -49,7 +97,13 @@ export function PracticePathPage({ pathId }: PracticePathPageProps) {
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 {summary.eyebrow}
               </p>
-              {summary.paper && <Badge variant="accent">{summary.paper}</Badge>}
+              {summary.paper && (
+                <Badge
+                  variant={summary.paper === "Paper 1" ? "paper-1" : "paper-2"}
+                >
+                  {summary.paper}
+                </Badge>
+              )}
             </div>
             <h1 className="mt-2 text-2xl font-bold text-foreground sm:text-3xl">
               {summary.title}
@@ -69,13 +123,12 @@ export function PracticePathPage({ pathId }: PracticePathPageProps) {
         {!quizStarted ? (
           <>
             <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-              <Card className="overflow-hidden">
-                <div className="rounded-[28px] border border-accent/20 bg-[linear-gradient(145deg,rgba(139,92,246,0.16),rgba(17,17,19,0.95)_42%,rgba(17,17,19,1))] p-6">
+              <Card variant={routeMeta.cardVariant} className="overflow-hidden p-6">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div className="space-y-3">
-                      <div className="inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-accent">
+                      <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-foreground/85">
                         <Layers3 size={12} />
-                        {summary.title}
+                        {routeMeta.routeLabel}
                       </div>
                       <h2 className="text-2xl font-semibold text-foreground">
                         {summary.purpose}
@@ -89,10 +142,43 @@ export function PracticePathPage({ pathId }: PracticePathPageProps) {
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2 sm:max-w-[220px] sm:justify-end">
-                      <Badge variant="accent">{summary.questionCount} questions</Badge>
+                      <Badge variant={routeMeta.badgeVariant}>{summary.questionCount} questions</Badge>
                       <Badge variant="default">{summary.topicCount} topics</Badge>
                       <Badge variant="warning">{summary.examDrillCount} drills mapped</Badge>
                     </div>
+                  </div>
+
+                  <div className="mt-5 grid gap-3 md:grid-cols-2">
+                    <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        Route focus
+                      </p>
+                      <p className="mt-2 text-sm leading-relaxed text-foreground/90">
+                        {routeMeta.routeFocus}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        Next after this
+                      </p>
+                      <p className="mt-2 text-sm leading-relaxed text-foreground/90">
+                        {routeMeta.nextStep}
+                      </p>
+                    </div>
+                    {examEntry && (
+                      <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4 md:col-span-2">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                          Summer 2026 official date
+                        </p>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-semibold text-foreground">{examEntry.dateLabel}</p>
+                          {examEntry.duration && <Badge variant={routeMeta.badgeVariant}>{examEntry.duration}</Badge>}
+                        </div>
+                        <p className="mt-2 text-sm leading-relaxed text-foreground/90">
+                          {examEntry.summary}
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   <div className="mt-6 flex flex-wrap gap-2">
@@ -104,10 +190,37 @@ export function PracticePathPage({ pathId }: PracticePathPageProps) {
                       <Button variant="outline">Open practice hub</Button>
                     </Link>
                   </div>
-                </div>
               </Card>
 
-              <Card className="space-y-4">
+              <Card variant="support" className="space-y-4">
+                {(pathId === "paper-1" || pathId === "paper-2") && (
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      Official qualification context
+                    </p>
+                    <div className="mt-3 space-y-2">
+                      {qualificationOverview.assessmentComponents
+                        .filter((component) =>
+                          pathId === "paper-1"
+                            ? component.id !== "occupational-specialism"
+                            : component.id !== "core-exam-1"
+                        )
+                        .slice(0, 2)
+                        .map((component) => (
+                          <div
+                            key={component.id}
+                            className="rounded-xl border border-white/8 bg-black/20 px-3 py-3"
+                          >
+                            <p className="text-sm font-medium text-foreground">{component.title}</p>
+                            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                              {component.summary}
+                            </p>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                     Included topics
@@ -133,13 +246,35 @@ export function PracticePathPage({ pathId }: PracticePathPageProps) {
                       {paperBundle.quizQuestions.slice(0, 3).map((question) => (
                         <div
                           key={question.id}
-                          className="rounded-xl border border-border bg-surface/30 px-3 py-3"
-                        >
-                          <p className="text-sm font-medium text-foreground">{question.question}</p>
-                          <p className="mt-1 text-xs text-muted-foreground">
+                        className="rounded-xl border border-white/8 bg-black/20 px-3 py-3"
+                      >
+                        <p className="text-sm font-medium text-foreground">{question.question}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
                             {question.sourceLabel ?? question.paper ?? "Practice route"}
                           </p>
                         </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {(pathId === "paper-1" || pathId === "paper-2") && (
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      Official guides
+                    </p>
+                    <div className="mt-3 space-y-2">
+                      {officialResources.slice(0, 2).map((resource) => (
+                        <a
+                          key={resource.id}
+                          href={resource.filePath}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center justify-between rounded-xl border border-white/8 bg-black/20 px-3 py-3 text-sm text-foreground transition-colors hover:border-accent/20 hover:bg-card"
+                        >
+                          <span>{resource.title}</span>
+                          <ArrowRight size={14} className="text-accent" />
+                        </a>
                       ))}
                     </div>
                   </div>
@@ -152,21 +287,21 @@ export function PracticePathPage({ pathId }: PracticePathPageProps) {
                   <div className="mt-3 space-y-2">
                     <Link
                       href="/revision/quick-quiz"
-                      className="flex items-center justify-between rounded-xl border border-border bg-surface/30 px-3 py-3 text-sm text-foreground transition-colors hover:border-accent/20 hover:bg-card"
+                      className="flex items-center justify-between rounded-xl border border-white/8 bg-black/20 px-3 py-3 text-sm text-foreground transition-colors hover:border-accent/20 hover:bg-card"
                     >
                       <span>Quick quiz</span>
                       <ArrowRight size={14} className="text-accent" />
                     </Link>
                     <Link
                       href="/revision/paper-1"
-                      className="flex items-center justify-between rounded-xl border border-border bg-surface/30 px-3 py-3 text-sm text-foreground transition-colors hover:border-accent/20 hover:bg-card"
+                      className="flex items-center justify-between rounded-xl border border-white/8 bg-black/20 px-3 py-3 text-sm text-foreground transition-colors hover:border-accent/20 hover:bg-card"
                     >
                       <span>Paper 1 practice</span>
                       <ArrowRight size={14} className="text-accent" />
                     </Link>
                     <Link
                       href="/revision/paper-2"
-                      className="flex items-center justify-between rounded-xl border border-border bg-surface/30 px-3 py-3 text-sm text-foreground transition-colors hover:border-accent/20 hover:bg-card"
+                      className="flex items-center justify-between rounded-xl border border-white/8 bg-black/20 px-3 py-3 text-sm text-foreground transition-colors hover:border-accent/20 hover:bg-card"
                     >
                       <span>Paper 2 practice</span>
                       <ArrowRight size={14} className="text-accent" />
@@ -177,71 +312,74 @@ export function PracticePathPage({ pathId }: PracticePathPageProps) {
             </div>
           </>
         ) : (
-          <div className="space-y-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Active route
-                </p>
-                <h2 className="mt-1 text-xl font-semibold text-foreground">
-                  {summary.title}
-                </h2>
+            <div className="space-y-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    Active route
+                  </p>
+                  <h2 className="mt-1 text-xl font-semibold text-foreground">
+                    {summary.title}
+                  </h2>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {routeMeta.routeFocus}
+                  </p>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setQuizStarted(false)}>
+                  Exit route
+                </Button>
               </div>
-              <Button variant="ghost" size="sm" onClick={() => setQuizStarted(false)}>
-                Exit route
-              </Button>
-            </div>
 
-            <QuickQuiz
-              autoStart
-              paperId={pathId === "mixed" ? undefined : pathId}
-            />
+              <QuickQuiz
+                autoStart
+                paperId={pathId === "mixed" ? undefined : pathId}
+              />
 
-            <Card className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <Target size={14} className="text-accent" />
-                  <p className="text-sm font-semibold text-foreground">Topic practice</p>
+              <Card variant="support" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Target size={14} className="text-accent" />
+                    <p className="text-sm font-semibold text-foreground">Topic practice</p>
+                  </div>
+                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                    Want to stay in one area after this route? Open a topic workspace and continue with recall, exam drills, and written answers.
+                  </p>
                 </div>
-                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                  Want to stay in one area after this route? Open a topic workspace and continue with recall, exam drills, and written answers.
-                </p>
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <BookOpen size={14} className="text-warning" />
-                  <p className="text-sm font-semibold text-foreground">Related routes</p>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <BookOpen size={14} className="text-warning" />
+                    <p className="text-sm font-semibold text-foreground">Related routes</p>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Link
+                      href="/revision/paper-1"
+                      className="rounded-lg border border-border bg-surface/30 px-3 py-2 text-xs text-foreground"
+                    >
+                      Paper 1
+                    </Link>
+                    <Link
+                      href="/revision/paper-2"
+                      className="rounded-lg border border-border bg-surface/30 px-3 py-2 text-xs text-foreground"
+                    >
+                      Paper 2
+                    </Link>
+                    <Link
+                      href="/revision/quick-quiz"
+                      className="rounded-lg border border-border bg-surface/30 px-3 py-2 text-xs text-foreground"
+                    >
+                      Quick Quiz
+                    </Link>
+                  </div>
                 </div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <Link
-                    href="/revision/paper-1"
-                    className="rounded-lg border border-border bg-surface/30 px-3 py-2 text-xs text-foreground"
-                  >
-                    Paper 1
-                  </Link>
-                  <Link
-                    href="/revision/paper-2"
-                    className="rounded-lg border border-border bg-surface/30 px-3 py-2 text-xs text-foreground"
-                  >
-                    Paper 2
-                  </Link>
-                  <Link
-                    href="/revision/quick-quiz"
-                    className="rounded-lg border border-border bg-surface/30 px-3 py-2 text-xs text-foreground"
-                  >
-                    Quick Quiz
-                  </Link>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Included topics</p>
+                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                    {relatedTopics.length > 0
+                      ? `${relatedTopics.map((topic) => topic.label).join(", ")}.`
+                      : "This route pulls from the broader revision pool."}
+                  </p>
                 </div>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-foreground">Included topics</p>
-                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                  {relatedTopics.length > 0
-                    ? `${relatedTopics.map((topic) => topic.label).join(", ")}.`
-                    : "This route pulls from the broader revision pool."}
-                </p>
-              </div>
-            </Card>
+              </Card>
           </div>
         )}
       </motion.div>

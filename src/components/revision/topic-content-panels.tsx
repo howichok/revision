@@ -5,7 +5,12 @@ import { useState } from "react";
 import { AlertCircle, FileQuestion } from "lucide-react";
 import { useAppData } from "@/components/providers/app-data-provider";
 import { Badge, Button, Card, ProgressBar } from "@/components/ui";
-import { getMarkSchemeConceptsForQuestion, getTopicContentBundle } from "@/lib/content";
+import {
+  getMarkSchemeConceptsForQuestion,
+  getResourceHref,
+  getTopicContentBundle,
+  isResourceExternal,
+} from "@/lib/content";
 import { getPracticeSetId } from "@/lib/practice";
 import { getPracticeSetProgress, getSubtopicProgressForTopic } from "@/lib/progress";
 import { getTopicById, getTopicTree } from "@/lib/types";
@@ -52,7 +57,7 @@ export function TopicOverviewPanel({ topicId }: { topicId: string }) {
 
   return (
     <div className="space-y-5">
-      <Card className="p-5 sm:p-6">
+      <Card variant="task" className="p-5 sm:p-6">
         <p className="text-sm leading-relaxed text-muted-foreground">{tree.description}</p>
 
         <div className="mt-5 grid gap-3 md:grid-cols-3">
@@ -104,7 +109,7 @@ export function TopicOverviewPanel({ topicId }: { topicId: string }) {
       </Card>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Card className="p-4">
+        <Card variant="support" className="p-4">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             Diagnostic score
           </p>
@@ -116,7 +121,7 @@ export function TopicOverviewPanel({ topicId }: { topicId: string }) {
           </div>
         </Card>
 
-        <Card className="p-4">
+        <Card variant="support" className="p-4">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             Reviewed subtopics
           </p>
@@ -126,7 +131,7 @@ export function TopicOverviewPanel({ topicId }: { topicId: string }) {
           <ProgressBar value={topicProgress.progressPercent} className="mt-3" size="sm" />
         </Card>
 
-        <Card className="p-4">
+        <Card variant="support" className="p-4">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             Paper mapping
           </p>
@@ -145,7 +150,7 @@ export function TopicOverviewPanel({ topicId }: { topicId: string }) {
       </div>
 
       {topicContent.mapping && (
-        <Card className="p-5 sm:p-6">
+        <Card variant="support" className="p-5 sm:p-6">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">
             Official DSD 2025 Coverage
           </p>
@@ -156,7 +161,7 @@ export function TopicOverviewPanel({ topicId }: { topicId: string }) {
             {topicContent.officialPoints.map((point) => (
               <div
                 key={point.id}
-                className="rounded-xl border border-border bg-surface/30 px-4 py-4"
+                className="rounded-xl border border-white/8 bg-black/20 px-4 py-4"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -175,7 +180,7 @@ export function TopicOverviewPanel({ topicId }: { topicId: string }) {
       )}
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <Card className="p-5 sm:p-6">
+          <Card variant="task" className="p-5 sm:p-6">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Topic structure
           </p>
@@ -183,7 +188,7 @@ export function TopicOverviewPanel({ topicId }: { topicId: string }) {
             {tree.subtopics.map((subtopic) => (
               <div
                 key={subtopic.id}
-                className="rounded-xl border border-border bg-surface/30 px-4 py-4"
+                className="rounded-xl border border-white/8 bg-black/20 px-4 py-4"
               >
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-xs text-accent">{subtopic.id}</span>
@@ -205,7 +210,7 @@ export function TopicOverviewPanel({ topicId }: { topicId: string }) {
         </Card>
 
         <div className="space-y-4">
-          <Card className="p-5">
+          <Card variant="support" className="p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               Focused subtopics
             </p>
@@ -228,7 +233,7 @@ export function TopicOverviewPanel({ topicId }: { topicId: string }) {
             </div>
           </Card>
 
-          <Card className="p-5">
+          <Card variant="support" className="p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               Key terms and exam language
             </p>
@@ -254,7 +259,7 @@ export function TopicExamQuestionsPanel({ topicId }: { topicId: string }) {
 
   if (topicContent.questions.length === 0) {
     return (
-      <Card className="p-8 text-center">
+      <Card variant="support" className="p-8 text-center">
         <FileQuestion size={40} className="mx-auto mb-3 text-muted-foreground opacity-50" />
         <p className="text-sm text-muted-foreground mb-2">Past exam-style questions</p>
         <p className="text-xs text-muted-foreground/70">
@@ -270,7 +275,7 @@ export function TopicExamQuestionsPanel({ topicId }: { topicId: string }) {
         const conceptTargets = getMarkSchemeConceptsForQuestion(question.id);
 
         return (
-          <Card key={question.id} className="p-5">
+          <Card key={question.id} variant="warning" className="p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <p className="text-sm font-semibold text-foreground">{question.title}</p>
@@ -285,7 +290,7 @@ export function TopicExamQuestionsPanel({ topicId }: { topicId: string }) {
               </div>
             </div>
             <p className="mt-3 text-xs leading-relaxed text-muted">{question.summary}</p>
-            <div className="mt-3 rounded-lg border border-border bg-surface/30 px-3 py-3">
+            <div className="mt-3 rounded-lg border border-white/8 bg-black/20 px-3 py-3">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground mb-1">
                 Answer focus
               </p>
@@ -317,7 +322,7 @@ export function TopicResourcesPanel({ topicId }: { topicId: string }) {
 
   if (topicContent.resources.length === 0) {
     return (
-      <Card className="p-5">
+      <Card variant="support" className="p-5">
         <p className="text-sm text-muted-foreground">
           No structured resources are mapped to this topic yet.
         </p>
@@ -328,7 +333,7 @@ export function TopicResourcesPanel({ topicId }: { topicId: string }) {
   return (
     <div className="space-y-3">
       {topicContent.resources.map((resource) => (
-        <Card key={resource.id} className="p-5">
+        <Card key={resource.id} variant="support" className="p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="text-sm font-semibold text-foreground">{resource.title}</p>
@@ -353,6 +358,18 @@ export function TopicResourcesPanel({ topicId }: { topicId: string }) {
               )}
             </div>
           </div>
+          {getResourceHref(resource) && (
+            <div className="mt-4">
+              <a
+                href={getResourceHref(resource)}
+                target={isResourceExternal(resource) ? "_blank" : undefined}
+                rel={isResourceExternal(resource) ? "noreferrer" : undefined}
+                className="inline-flex items-center gap-1 text-xs font-medium text-accent"
+              >
+                {isResourceExternal(resource) ? "Open official source" : "Open resource"}
+              </a>
+            </div>
+          )}
         </Card>
       ))}
     </div>
@@ -439,7 +456,7 @@ export function TopicProgressPanel({ topicId }: { topicId: string }) {
         </div>
       )}
 
-      <Card className="p-5">
+      <Card variant="support" className="p-5">
         <div className="flex items-center gap-4">
           <div className="text-3xl font-bold text-foreground">
             {topicProgress.progressPercent}%
@@ -453,7 +470,7 @@ export function TopicProgressPanel({ topicId }: { topicId: string }) {
         </div>
       </Card>
 
-      <Card className="p-5">
+      <Card variant="support" className="p-5">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
           Subtopic review state
         </p>
@@ -480,7 +497,7 @@ export function TopicProgressPanel({ topicId }: { topicId: string }) {
         </div>
       </Card>
 
-      <Card className="p-5">
+      <Card variant="support" className="p-5">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
           Practice sets
         </p>

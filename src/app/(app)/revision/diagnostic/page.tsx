@@ -4,6 +4,7 @@ import { PageContainer } from "@/components/layout/page-container";
 import { RevisionSubnav } from "@/components/revision/revision-subnav";
 import { DiagnosticWorkspace } from "@/components/revision/diagnostic-workspace";
 import { useAppData } from "@/components/providers/app-data-provider";
+import { Card } from "@/components/ui";
 import type { DiagnosticResult } from "@/lib/types";
 
 export default function DiagnosticPage() {
@@ -18,7 +19,7 @@ export default function DiagnosticPage() {
       <div className="space-y-6">
         <RevisionSubnav activeRoute="diagnostic" />
 
-        <div>
+        <Card variant="accent" className="p-5 sm:p-6">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Revision diagnostic
           </p>
@@ -29,11 +30,10 @@ export default function DiagnosticPage() {
             This route is only for diagnosis. You will choose one topic, explain what you know,
             answer targeted follow-up checks, then finish with a clear saved result and next revision step.
           </p>
-        </div>
+        </Card>
 
         <DiagnosticWorkspace diagnostic={diagnostic} onComplete={handleComplete} />
       </div>
     </PageContainer>
   );
 }
-

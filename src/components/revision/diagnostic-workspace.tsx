@@ -121,10 +121,10 @@ function DiagnosticStepHeader({ activeStage }: { activeStage: Stage }) {
               className={cn(
                 "rounded-2xl border px-4 py-4",
                 isActive
-                  ? "border-accent/30 bg-accent/10"
+                  ? "surface-status-warning"
                   : isComplete
-                    ? "border-success/20 bg-success/10"
-                    : "border-border bg-surface/30"
+                    ? "surface-status-success"
+                    : "surface-cutout"
               )}
             >
               <div className="flex items-center gap-2">
@@ -164,7 +164,7 @@ function DiagnosticResultsSummary({ report }: { report: TopicDiagnosticReport })
 
   return (
     <div className="space-y-5">
-      <Card className="p-5 sm:p-6">
+      <Card variant="success" className="p-5 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="flex items-center gap-2">
@@ -177,7 +177,7 @@ function DiagnosticResultsSummary({ report }: { report: TopicDiagnosticReport })
               You now have a saved coverage map for this topic. Use it to move directly into weak-topic practice instead of guessing what to revise next.
             </p>
           </div>
-          <div className="min-w-[180px] rounded-2xl border border-border bg-surface/30 px-4 py-3">
+          <div className="surface-cutout min-w-[180px] rounded-2xl px-4 py-3">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>Diagnostic confidence</span>
               <span>{Math.round(report.confidence * 100)}%</span>
@@ -193,7 +193,7 @@ function DiagnosticResultsSummary({ report }: { report: TopicDiagnosticReport })
             { label: "Unassessed", value: unassessedCount, tone: "default" as const },
             { label: "Misconceptions", value: misconceptionCount, tone: "danger" as const },
           ].map((item) => (
-            <div key={item.label} className="rounded-2xl border border-border bg-card/60 px-4 py-4">
+            <div key={item.label} className="surface-cutout rounded-2xl px-4 py-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 {item.label}
               </p>
@@ -207,14 +207,14 @@ function DiagnosticResultsSummary({ report }: { report: TopicDiagnosticReport })
       </Card>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <Card className="p-5 sm:p-6">
+        <Card variant="task" className="p-5 sm:p-6">
           <div className="flex items-center gap-2">
             <Target size={15} className="text-accent" />
             <h3 className="text-sm font-semibold text-foreground">Point-by-point coverage</h3>
           </div>
           <div className="mt-4 space-y-3">
             {report.curriculumPoints.map((point) => (
-              <div key={point.pointId} className="rounded-2xl border border-border bg-surface/20 px-4 py-4">
+              <div key={point.pointId} className="surface-cutout rounded-2xl px-4 py-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -280,7 +280,7 @@ function DiagnosticResultsSummary({ report }: { report: TopicDiagnosticReport })
         </Card>
 
         <div className="space-y-4">
-          <Card className="p-5">
+          <Card variant="warning" className="p-5">
             <div className="flex items-center gap-2">
               <ClipboardCheck size={14} className="text-warning" />
               <h3 className="text-sm font-semibold text-foreground">Next revision targets</h3>
@@ -303,7 +303,7 @@ function DiagnosticResultsSummary({ report }: { report: TopicDiagnosticReport })
             </div>
           </Card>
 
-          <Card className="p-5">
+          <Card variant="support" className="p-5">
             <div className="flex items-center gap-2">
               <Sparkles size={14} className="text-accent" />
               <h3 className="text-sm font-semibold text-foreground">Suggested support material</h3>
@@ -311,7 +311,7 @@ function DiagnosticResultsSummary({ report }: { report: TopicDiagnosticReport })
             <div className="mt-4 space-y-2">
               {recommendedMaterials.length > 0 ? (
                 recommendedMaterials.map((material) => (
-                  <div key={material.id} className="rounded-xl border border-border bg-surface/30 px-3 py-3">
+                  <div key={material.id} className="surface-cutout rounded-xl px-3 py-3">
                     <p className="text-sm font-medium text-foreground">{material.title}</p>
                     <p className="mt-1 text-xs text-muted-foreground">{material.description}</p>
                   </div>
@@ -324,7 +324,7 @@ function DiagnosticResultsSummary({ report }: { report: TopicDiagnosticReport })
             </div>
           </Card>
 
-          <Card className="p-5">
+          <Card variant="navigation" className="p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               Next step
             </p>
@@ -579,7 +579,7 @@ export function DiagnosticWorkspace({
     <div className="space-y-6">
       <DiagnosticStepHeader activeStage={currentStage} />
 
-      <div className="rounded-[32px] border border-border bg-card/90 p-5 sm:p-7">
+      <Card variant="navigation" className="rounded-[32px] p-5 sm:p-7">
         {error && (
           <div className="mb-5 flex items-center gap-2 rounded-2xl border border-danger/20 bg-danger/10 px-4 py-3 text-sm text-danger">
             <AlertCircle size={14} className="shrink-0" />
@@ -655,7 +655,7 @@ export function DiagnosticWorkspace({
                 </div>
               </motion.div>
 
-              <Card className="p-5">
+              <Card variant="support" className="p-5">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                   How this flow works
                 </p>
@@ -666,7 +666,7 @@ export function DiagnosticWorkspace({
                     "Answer only the follow-up checks needed to confirm weak points.",
                     "Finish with a saved results summary and direct next-step practice.",
                   ].map((item) => (
-                    <div key={item} className="rounded-xl border border-border bg-surface/30 px-3 py-3 text-sm text-foreground">
+                    <div key={item} className="surface-cutout rounded-xl px-3 py-3 text-sm text-foreground">
                       {item}
                     </div>
                   ))}
@@ -688,7 +688,7 @@ export function DiagnosticWorkspace({
                       "rounded-2xl border px-4 py-4 text-left transition-all",
                       isPreview
                         ? "border-accent/40 bg-accent/10 shadow-[0_0_20px_-8px_rgba(139,92,246,0.3)]"
-                        : "border-border bg-surface/40 hover:border-accent/20 hover:bg-card/80"
+                        : "surface-cutout hover:border-accent/20 hover:bg-card/80"
                     )}
                   >
                     <div className="flex items-center gap-3">
@@ -710,7 +710,7 @@ export function DiagnosticWorkspace({
         {(stage === "baseline" || stage === "follow-up") && activeTopic && activeDefinition && (
           <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
             <div className="space-y-4 xl:sticky xl:top-24 xl:self-start">
-              <Card className="p-5">
+              <Card variant="support" className="p-5">
                 <div className="flex items-start gap-3">
                   <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-accent/20 bg-accent/10 text-xl">
                     {activeTopic.icon}
@@ -727,14 +727,14 @@ export function DiagnosticWorkspace({
                 </p>
                 <div className="mt-4 flex flex-wrap gap-2">
                   {activeDefinition.points.slice(0, 4).map((point) => (
-                    <span key={point.id} className="rounded-xl border border-border bg-surface/30 px-2.5 py-1 text-[11px] text-muted-foreground">
+                    <span key={point.id} className="surface-cutout rounded-xl px-2.5 py-1 text-[11px] text-muted-foreground">
                       {point.id}
                     </span>
                   ))}
                 </div>
               </Card>
 
-              <Card className="p-5">
+              <Card variant="warning" className="p-5">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
@@ -766,13 +766,13 @@ export function DiagnosticWorkspace({
               </Card>
 
               {analysis && (
-                <Card className="p-5">
+                <Card variant="support" className="p-5">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                     What is being assessed
                   </p>
                   <div className="mt-4 space-y-2">
                     {analysis.curriculumPoints.map((point) => (
-                      <div key={point.pointId} className="rounded-xl border border-border bg-surface/30 px-3 py-3">
+                      <div key={point.pointId} className="surface-cutout rounded-xl px-3 py-3">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-mono text-xs text-accent">{point.pointId}</span>
                           <p className="text-sm font-medium text-foreground">{point.label}</p>
@@ -786,7 +786,7 @@ export function DiagnosticWorkspace({
             </div>
 
             <div className="space-y-5">
-              <Card className="overflow-hidden p-0">
+              <Card variant="task" className="overflow-hidden p-0">
                 <div className="border-b border-border/80 bg-[linear-gradient(180deg,rgba(139,92,246,0.08),transparent)] px-5 py-4 sm:px-6">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
@@ -894,7 +894,7 @@ export function DiagnosticWorkspace({
         {stage === "results" && completedReport && (
           <DiagnosticResultsSummary report={completedReport} />
         )}
-      </div>
+      </Card>
     </div>
   );
 }

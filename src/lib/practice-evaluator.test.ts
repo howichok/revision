@@ -15,6 +15,18 @@ function getHealthcareQuestion() {
   return question;
 }
 
+function getDigitalServiceQuestion() {
+  const bundle = getTopicPracticeBundle("business");
+  const question = bundle.quizQuestions.find(
+    (entry) =>
+      entry.question ===
+      "Explain one practical way a team can make sure a digital service stays useful for its users."
+  );
+
+  assert.ok(question, "Expected digital service quality question to exist in practice bundle.");
+  return question;
+}
+
 test("accepts direct rubric wording for the healthcare records question", () => {
   const question = getHealthcareQuestion();
   const evaluation = evaluatePracticeShortAnswer(
@@ -107,4 +119,97 @@ test("rejects a clearly wrong answer to the healthcare records question", () => 
   assert.equal(evaluation.verdict, "not-quite");
   assert.ok(evaluation.score <= 1);
   assert.ok(evaluation.missingSlots.length >= 3);
+});
+
+test("accepts direct rubric wording for the digital service quality question", () => {
+  const question = getDigitalServiceQuestion();
+  const evaluation = evaluatePracticeShortAnswer(
+    "A team can collect user feedback, use it to identify changing user needs, and prioritise updates so the digital service stays useful.",
+    question
+  );
+
+  assert.equal(evaluation.isCorrect, true);
+  assert.equal(evaluation.verdict, "strong");
+  assert.ok(
+    evaluation.matchedSlots.includes(
+      "A practical method for gathering user evidence is identified"
+    )
+  );
+  assert.ok(
+    evaluation.matchedSlots.includes(
+      "Findings are turned into updates or improvements"
+    )
+  );
+});
+
+test("accepts paraphrased digital service answer about feedback loops and updates", () => {
+  const question = getDigitalServiceQuestion();
+  const evaluation = evaluatePracticeShortAnswer(
+    "The team should keep a continuous feedback loop by reviewing what users report and how they behave in the service, then use that evidence to prioritise valuable changes as user needs change.",
+    question
+  );
+
+  assert.equal(evaluation.isCorrect, true);
+  assert.ok(evaluation.score >= 3.5);
+  assert.ok(evaluation.confidence >= 0.7);
+  assert.ok(
+    evaluation.matchedSlots.includes(
+      "The evidence is used to understand user needs or pain points"
+    )
+  );
+});
+
+test("accepts a short but correct practical service-quality answer as mostly correct", () => {
+  const question = getDigitalServiceQuestion();
+  const evaluation = evaluatePracticeShortAnswer(
+    "Use regular user feedback to prioritise helpful updates.",
+    question
+  );
+
+  assert.equal(evaluation.isCorrect, true);
+  assert.equal(evaluation.verdict, "mostly-correct");
+  assert.ok(
+    evaluation.feedback.includes("useful") ||
+      evaluation.feedback.includes("user needs")
+  );
+});
+
+test("rewards a developed digital service answer with consequences and value", () => {
+  const question = getDigitalServiceQuestion();
+  const evaluation = evaluatePracticeShortAnswer(
+    "A team can run regular usability testing and collect feedback after releases, then analyse that evidence to find pain points and changing user needs. They can prioritise the updates that remove friction and deliver the most value, so the service stays useful instead of gradually becoming less relevant.",
+    question
+  );
+
+  assert.equal(evaluation.isCorrect, true);
+  assert.equal(evaluation.verdict, "strong");
+  assert.equal(evaluation.missingSlots.length, 0);
+});
+
+test("marks an incomplete digital service answer as partial instead of fully wrong", () => {
+  const question = getDigitalServiceQuestion();
+  const evaluation = evaluatePracticeShortAnswer(
+    "Ask users what they think about the service.",
+    question
+  );
+
+  assert.equal(evaluation.isCorrect, false);
+  assert.equal(evaluation.verdict, "partial");
+  assert.ok(
+    evaluation.missingSlots.includes(
+      "Findings are turned into updates or improvements"
+    )
+  );
+});
+
+test("rejects a wrong answer to the digital service quality question", () => {
+  const question = getDigitalServiceQuestion();
+  const evaluation = evaluatePracticeShortAnswer(
+    "Make the logo brighter and add more animations so the service looks modern.",
+    question
+  );
+
+  assert.equal(evaluation.isCorrect, false);
+  assert.equal(evaluation.verdict, "not-quite");
+  assert.ok(evaluation.score <= 1);
 });

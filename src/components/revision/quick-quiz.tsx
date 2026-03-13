@@ -13,7 +13,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useAppData } from "@/components/providers/app-data-provider";
-import { Badge, Button, ProgressBar } from "@/components/ui";
+import { Badge, Button, Card, ProgressBar } from "@/components/ui";
 import {
   getFilteredQuickQuizQuestionPool,
   getPracticeSetId,
@@ -52,6 +52,54 @@ const typeIcon = {
   "short-answer": MessageSquare,
 };
 
+function getRouteMeta(paperId?: "paper-1" | "paper-2", topicId?: string) {
+  if (paperId === "paper-1") {
+    return {
+      badgeVariant: "paper-1" as const,
+      heroVariant: "paper-1" as const,
+      taskVariant: "paper-1" as const,
+      routeLabel: "Paper 1 route",
+      routeFocus: "Knowledge checks, terminology, and fast theory retrieval.",
+      resultSummary:
+        "This route is best for quick correction on theory-heavy wording before you move into broader topic practice.",
+    };
+  }
+
+  if (paperId === "paper-2") {
+    return {
+      badgeVariant: "paper-2" as const,
+      heroVariant: "paper-2" as const,
+      taskVariant: "paper-2" as const,
+      routeLabel: "Paper 2 route",
+      routeFocus: "Applied scenarios, short written explanations, and exam-style thinking.",
+      resultSummary:
+        "This route is best for testing applied reasoning before you move into answer checking or topic-specific written practice.",
+    };
+  }
+
+  if (topicId) {
+    return {
+      badgeVariant: "accent" as const,
+      heroVariant: "accent" as const,
+      taskVariant: "task" as const,
+      routeLabel: "Topic route",
+      routeFocus: "Fast retrieval inside one topic without mixing in unrelated paper prompts.",
+      resultSummary:
+        "This route is best when you want a tight score inside one topic before moving into recall or answer checking.",
+    };
+  }
+
+  return {
+    badgeVariant: "accent" as const,
+    heroVariant: "accent" as const,
+    taskVariant: "task" as const,
+    routeLabel: "Mixed route",
+    routeFocus: "Broad retrieval across topics when you want a warm-up before narrowing down.",
+    resultSummary:
+      "This route is best when you want broad recall before switching into a paper route or one weak topic.",
+  };
+}
+
 export function QuickQuiz({
   topicId,
   paperId,
@@ -61,6 +109,7 @@ export function QuickQuiz({
   const { trackPracticeSetProgress } = useAppData();
   const lockedPaper =
     paperId === "paper-1" ? "Paper 1" : paperId === "paper-2" ? "Paper 2" : undefined;
+  const routeMeta = getRouteMeta(paperId, topicId);
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(topicId ?? null);
   const [quizStarted, setQuizStarted] = useState(autoStart);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -220,18 +269,18 @@ export function QuickQuiz({
         <div className="text-center">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-accent">
             <Zap size={12} />
-            Quick Quiz
+            {routeMeta.routeLabel}
           </div>
           <h2 className="text-2xl font-bold text-foreground sm:text-3xl">
             Test yourself with fast retrieval questions
           </h2>
           <p className="mx-auto mt-2 max-w-2xl text-sm text-muted">
-            Questions are built from glossary terms, mapped subtopics, official point drills, and PDF-derived exam prompts.
+            {routeMeta.routeFocus}
           </p>
         </div>
 
         {lockedTopic ? (
-          <div className="rounded-[28px] border border-accent/20 bg-[linear-gradient(145deg,rgba(139,92,246,0.16),rgba(17,17,19,0.95)_42%,rgba(17,17,19,1))] p-6">
+          <Card variant="accent" className="rounded-[28px] p-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="space-y-2">
                 <div className="flex items-center gap-3">
@@ -256,9 +305,9 @@ export function QuickQuiz({
                 <ArrowRight size={14} />
               </Button>
             </div>
-          </div>
+          </Card>
         ) : lockedPaper ? (
-          <div className="rounded-[28px] border border-accent/20 bg-[linear-gradient(145deg,rgba(139,92,246,0.16),rgba(17,17,19,0.95)_42%,rgba(17,17,19,1))] p-6">
+          <Card variant={routeMeta.heroVariant} className="rounded-[28px] p-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="space-y-2">
                 <div className="flex items-center gap-3">
@@ -277,13 +326,16 @@ export function QuickQuiz({
                 <p className="text-sm text-muted-foreground">
                   {lockedPaperCount} questions filtered to {lockedPaper.toLowerCase()} structure and wording.
                 </p>
+                <p className="text-xs leading-relaxed text-muted-foreground/80">
+                  {routeMeta.resultSummary}
+                </p>
               </div>
               <Button size="lg" onClick={() => startQuiz()}>
                 Start {lockedPaper} quiz
                 <ArrowRight size={14} />
               </Button>
             </div>
-          </div>
+          </Card>
         ) : (
           <>
             <div className="flex justify-center">
@@ -378,7 +430,12 @@ export function QuickQuiz({
           </p>
         </div>
 
-        <div className="space-y-4 rounded-2xl border border-border bg-surface/40 p-6">
+        <Card
+          variant={
+            scorePct >= 70 ? "success" : scorePct >= 40 ? "warning" : "danger"
+          }
+          className="space-y-4 p-6"
+        >
           <div
             className="text-5xl font-bold tabular-nums"
             style={{ color: `var(--color-${variant})` }}
@@ -393,12 +450,15 @@ export function QuickQuiz({
                 ? "Solid start. Review the items you missed and run it again."
                 : scorePct >= 40
                   ? "Some ideas are there, but the retrieval is still patchy."
-                  : "This topic needs another repetition cycle before you move on."}
+                : "This topic needs another repetition cycle before you move on."}
           </p>
-        </div>
+          <p className="text-xs leading-relaxed text-muted-foreground/80">
+            {routeMeta.resultSummary}
+          </p>
+        </Card>
 
         {selectedTopicId && (
-          <div className="rounded-xl border border-border bg-card/60 px-4 py-3 text-left">
+          <Card variant="support" className="px-4 py-3 text-left">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
               Saved progress
             </p>
@@ -409,7 +469,7 @@ export function QuickQuiz({
                   ? saveError
                   : "This quiz score has been recorded in your practice progress."}
             </p>
-          </div>
+          </Card>
         )}
 
         <div className="flex items-center justify-center gap-3">
@@ -429,11 +489,11 @@ export function QuickQuiz({
 
   if (!currentQuestion) {
     return (
-      <div className="rounded-2xl border border-border bg-surface/30 px-5 py-6 text-center">
+      <Card variant="support" className="px-5 py-6 text-center">
         <p className="text-sm text-muted-foreground">
           No quiz questions are mapped for this route yet.
         </p>
-      </div>
+      </Card>
     );
   }
 
@@ -444,20 +504,66 @@ export function QuickQuiz({
     currentQuestion.type === "short-answer"
       ? getAcceptedAnswerCues(currentQuestion)
       : [];
+  const shortAnswerTone =
+    currentQuestion.type === "short-answer" && currentCheck
+      ? currentCheck.verdict === "strong" || currentCheck.verdict === "mostly-correct"
+        ? "success"
+        : currentCheck.verdict === "partial"
+          ? "warning"
+          : "danger"
+      : isCorrect
+        ? "success"
+        : "danger";
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex-1">
-          <ProgressBar value={progressPct} size="sm" />
+      <Card variant="navigation" className="p-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Badge variant={routeMeta.badgeVariant}>{routeMeta.routeLabel}</Badge>
+              {currentQuestion.paper && (
+                <Badge
+                  variant={
+                    currentQuestion.paper === "Paper 1" ? "paper-1" : "paper-2"
+                  }
+                >
+                  {currentQuestion.paper}
+                </Badge>
+              )}
+            </div>
+            <p className="text-sm text-foreground">{routeMeta.routeFocus}</p>
+            <p className="text-xs text-muted-foreground">
+              {currentQuestion.type === "multiple-choice"
+                ? "This question checks fast recognition and retrieval."
+                : "This question checks whether your wording covers the expected rubric ideas."}
+            </p>
+          </div>
+          <div className="min-w-[220px] space-y-3">
+            <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+              <span>Question progress</span>
+              <span className="tabular-nums">
+                {currentIndex + 1}/{totalQuestions}
+              </span>
+            </div>
+            <ProgressBar
+              value={progressPct}
+              size="sm"
+              color={
+                paperId === "paper-2"
+                  ? "warning"
+                  : paperId === "paper-1"
+                    ? "accent"
+                    : undefined
+              }
+            />
+            <div className="flex items-center justify-between gap-3">
+              <Badge variant="default">{answeredCount} answered</Badge>
+              <Badge variant="accent">{score} correct</Badge>
+            </div>
+          </div>
         </div>
-        <div className="shrink-0 flex items-center gap-3">
-          <span className="tabular-nums text-xs text-muted-foreground">
-            {currentIndex + 1}/{totalQuestions}
-          </span>
-          <Badge variant="accent">{score} correct</Badge>
-        </div>
-      </div>
+      </Card>
 
       <AnimatePresence mode="wait">
         <motion.div
@@ -468,7 +574,7 @@ export function QuickQuiz({
           transition={{ duration: 0.25 }}
           className="space-y-5"
         >
-          <div className="rounded-2xl border border-border bg-surface/30 p-5 sm:p-6">
+          <Card variant={routeMeta.taskVariant} className="p-5 sm:p-6">
             <div className="mb-4 flex flex-wrap items-center gap-2">
               <div className="flex items-center gap-1.5">
                 <span className="text-base">{topicInfo?.icon}</span>
@@ -490,7 +596,13 @@ export function QuickQuiz({
                 </Badge>
               )}
               {currentQuestion.paper && (
-                <Badge variant="accent">{currentQuestion.paper}</Badge>
+                <Badge
+                  variant={
+                    currentQuestion.paper === "Paper 1" ? "paper-1" : "paper-2"
+                  }
+                >
+                  {currentQuestion.paper}
+                </Badge>
               )}
               <span
                 className={cn(
@@ -509,9 +621,26 @@ export function QuickQuiz({
             <h3 className="text-lg font-semibold leading-relaxed text-foreground">
               {currentQuestion.question}
             </h3>
-          </div>
+          </Card>
 
-          <div className="space-y-2.5">
+          <Card variant="input" className="space-y-3 p-4 sm:p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Your response
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {currentQuestion.type === "multiple-choice"
+                    ? "Choose the option that best fits the prompt."
+                    : "Write the answer in your own words, then compare it with the rubric feedback."}
+                </p>
+              </div>
+              <Badge variant="default">
+                {currentQuestion.type === "multiple-choice" ? "Select one" : "Written response"}
+              </Badge>
+            </div>
+
+            <div className="space-y-2.5">
             {currentQuestion.type === "multiple-choice" &&
               currentQuestion.options?.map((option, index) => {
                 const isSelected = selectedAnswer === option;
@@ -604,9 +733,9 @@ export function QuickQuiz({
                         : "border-danger/40 bg-danger/5 focus:ring-danger/30"
                       : "border-border bg-surface/40 focus:border-accent focus:ring-accent/30"
                   )}
-                />
+                  />
                 {hasSubmitted && (
-                  <div className="rounded-xl border border-border bg-card/60 px-3 py-3">
+                  <Card variant="support" className="px-3 py-3">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                       Accepted answer cues
                     </p>
@@ -622,55 +751,62 @@ export function QuickQuiz({
                           </span>
                         ))}
                     </div>
-                  </div>
+                  </Card>
                 )}
               </div>
             )}
-          </div>
+            </div>
+          </Card>
 
           {hasSubmitted && (
             <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              className={cn(
-                "rounded-2xl border px-4 py-4",
-                isCorrect
-                  ? "border-success/20 bg-success/5"
-                  : "border-danger/20 bg-danger/5"
-              )}
+              className="space-y-4"
             >
-              <div className="mb-2 flex items-center gap-2">
-                {isCorrect ? (
-                  <CheckCircle2 size={16} className="text-success" />
-                ) : (
-                  <XCircle size={16} className="text-danger" />
-                )}
-                <span
-                  className={cn(
-                    "text-sm font-semibold",
-                    isCorrect ? "text-success" : "text-danger"
+              <Card
+                variant={shortAnswerTone}
+                className="px-4 py-4"
+              >
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  {shortAnswerTone === "success" ? (
+                    <CheckCircle2 size={16} className="text-success" />
+                  ) : shortAnswerTone === "warning" ? (
+                    <Sparkles size={16} className="text-warning" />
+                  ) : (
+                    <XCircle size={16} className="text-danger" />
                   )}
-                >
-                  {currentQuestion.type === "short-answer" && currentCheck
-                    ? currentCheck.verdictLabel
-                    : isCorrect
-                      ? "Correct"
-                      : "Not quite"}
-                </span>
-                {currentQuestion.type === "short-answer" && currentCheck && (
-                  <span className="text-xs text-muted-foreground">
-                    Rubric confidence {Math.round(currentCheck.confidence * 100)}%
+                  <span
+                    className={cn(
+                      "text-sm font-semibold",
+                      shortAnswerTone === "success"
+                        ? "text-success"
+                        : shortAnswerTone === "warning"
+                          ? "text-warning"
+                          : "text-danger"
+                    )}
+                  >
+                    {currentQuestion.type === "short-answer" && currentCheck
+                      ? currentCheck.verdictLabel
+                      : isCorrect
+                        ? "Correct"
+                        : "Not quite"}
                   </span>
-                )}
-              </div>
-              <p className="text-sm leading-relaxed text-muted">
-                {currentQuestion.type === "short-answer" && currentCheck
-                  ? currentCheck.feedback
-                  : currentQuestion.explanation}
-              </p>
+                  {currentQuestion.type === "short-answer" && currentCheck && (
+                    <span className="text-xs text-muted-foreground">
+                      Rubric confidence {Math.round(currentCheck.confidence * 100)}%
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm leading-relaxed text-muted">
+                  {currentQuestion.type === "short-answer" && currentCheck
+                    ? currentCheck.feedback
+                    : currentQuestion.explanation}
+                </p>
+              </Card>
               {currentQuestion.type === "short-answer" && currentCheck && (
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <div>
+                  <Card variant="success" className="p-4">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                       Matched ideas
                     </p>
@@ -690,8 +826,13 @@ export function QuickQuiz({
                         </span>
                       )}
                     </div>
-                  </div>
-                  <div>
+                  </Card>
+                  <Card
+                    variant={
+                      currentCheck.partialSlots.length > 0 ? "warning" : "danger"
+                    }
+                    className="p-4"
+                  >
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                       Still missing
                     </p>
@@ -713,7 +854,7 @@ export function QuickQuiz({
                         </span>
                       )}
                     </div>
-                  </div>
+                  </Card>
                 </div>
               )}
             </motion.div>

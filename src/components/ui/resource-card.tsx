@@ -15,6 +15,9 @@ interface ResourceCardProps {
   thumbnail?: string;
   index?: number;
   className?: string;
+  href?: string;
+  external?: boolean;
+  actionLabel?: string;
 }
 
 const typeIcons = {
@@ -51,25 +54,14 @@ export function ResourceCard({
   thumbnail,
   index = 0,
   className,
+  href,
+  external = false,
+  actionLabel,
 }: ResourceCardProps) {
   const Icon = typeIcons[type];
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{
-        y: -2,
-        boxShadow: "0 0 0 1px rgba(139, 92, 246, 0.05), 0 2px 10px -3px rgba(139, 92, 246, 0.08), 0 0 16px -6px rgba(139, 92, 246, 0.05)",
-      }}
-      transition={{ delay: index * 0.04, duration: 0.3 }}
-      className={cn(
-        "group bg-card border border-border rounded-2xl overflow-hidden",
-        "hover:border-border-light hover:bg-card-hover transition-colors duration-300 cursor-pointer",
-        className
-      )}
-    >
-      {/* Thumbnail / Header */}
+  const content = (
+    <>
       {thumbnail ? (
         <div className="h-36 bg-surface relative overflow-hidden">
           <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${thumbnail})` }} />
@@ -91,7 +83,6 @@ export function ResourceCard({
         </div>
       )}
 
-      {/* Content */}
       <div className="px-4 pt-3 pb-4">
         <h3 className="text-sm font-semibold text-foreground line-clamp-2 group-hover:text-accent transition-colors leading-snug">
           {title}
@@ -99,19 +90,59 @@ export function ResourceCard({
         {description && (
           <p className="text-xs text-muted line-clamp-2 mt-1.5 leading-relaxed">{description}</p>
         )}
-        {topic && (
-          <div className="mt-3 pt-2.5 border-t border-border/50 flex items-center justify-between">
+
+        {(topic || href) && (
+          <div className="mt-3 pt-2.5 border-t border-border/50 flex items-center justify-between gap-3">
             <span className="text-[11px] text-muted-foreground flex items-center gap-1.5">
               {topicIcon && <span>{topicIcon}</span>}
-              {topic}
+              {topic ?? (external ? "Official web source" : "Resource")}
             </span>
-            <div className="flex items-center gap-1.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
-              <Download size={12} />
-              <ExternalLink size={12} />
+            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              {href ? (
+                <>
+                  <span>{actionLabel ?? (external ? "Open source" : "Open resource")}</span>
+                  {external ? <ExternalLink size={12} /> : <Download size={12} />}
+                </>
+              ) : (
+                <>
+                  <Download size={12} />
+                  <ExternalLink size={12} />
+                </>
+              )}
             </div>
           </div>
         )}
       </div>
+    </>
+  );
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{
+        y: -2,
+        boxShadow: "0 0 0 1px rgba(139, 92, 246, 0.05), 0 2px 10px -3px rgba(139, 92, 246, 0.08), 0 0 16px -6px rgba(139, 92, 246, 0.05)",
+      }}
+      transition={{ delay: index * 0.04, duration: 0.3 }}
+      className={cn(
+        "group bg-card border border-border rounded-2xl overflow-hidden",
+        "hover:border-border-light hover:bg-card-hover transition-colors duration-300 cursor-pointer",
+        className
+      )}
+    >
+      {href ? (
+        <a
+          href={href}
+          target={external ? "_blank" : undefined}
+          rel={external ? "noreferrer" : undefined}
+          className="block"
+        >
+          {content}
+        </a>
+      ) : (
+        content
+      )}
     </motion.div>
   );
 }

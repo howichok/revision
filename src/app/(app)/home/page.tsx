@@ -32,7 +32,7 @@ import {
   WeekActivity,
 } from "@/components/ui";
 import { PageContainer } from "@/components/layout/page-container";
-import { getRecommendedMaterialCards } from "@/lib/content";
+import { getExamGuide2026, getRecommendedMaterialCards } from "@/lib/content";
 import { getTopicById, getTopicLabel } from "@/lib/types";
 import {
   formatRelativeTime,
@@ -110,6 +110,7 @@ export default function HomePage() {
   if (!user) return null;
 
   const hasDiagnostic = Boolean(diagnostic);
+  const examGuide2026 = getExamGuide2026();
   const { greeting, tzLabel } = getLondonGreeting();
   const weakestTopics = getWeakestTopics(diagnostic, 3);
   const weekActivity = getWeekActivity(activityHistory);
@@ -294,10 +295,16 @@ export default function HomePage() {
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {studyPaths.map((path) => {
               const Icon = path.icon;
+              const cardVariant =
+                path.title === "Paper 2"
+                  ? "paper-2"
+                  : path.title === "Paper 1" || path.title === "Diagnostic"
+                    ? "accent"
+                    : "support";
 
               return (
                 <Link key={path.href} href={path.href} className="group">
-                  <Card hover className="h-full">
+                  <Card hover variant={cardVariant} className="h-full">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="flex items-center gap-2">
@@ -319,7 +326,56 @@ export default function HomePage() {
           </div>
         </motion.div>
 
-        <motion.div variants={fadeUp} custom={2} className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <motion.div variants={fadeUp} custom={2} className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">2026 exam roadmap</h2>
+              <p className="text-xs text-muted-foreground">
+                Official Pearson timeline points translated into the right route inside the app.
+              </p>
+            </div>
+            <Link href="/revision/progress" className="text-xs text-accent hover:text-accent/80 transition-colors">
+              See full progress
+            </Link>
+          </div>
+
+          <div className="grid gap-3 lg:grid-cols-3">
+            {examGuide2026.entries.slice(0, 3).map((entry) => {
+              const variant =
+                entry.emphasis === "paper-2"
+                  ? "paper-2"
+                  : entry.emphasis === "paper-1"
+                    ? "accent"
+                    : "support";
+
+              return (
+                <Card key={entry.id} variant={variant}>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    {entry.series}
+                  </p>
+                  <p className="mt-3 text-base font-semibold text-foreground">{entry.title}</p>
+                  <p className="mt-2 text-xs text-muted-foreground">{entry.dateLabel}</p>
+                  {entry.duration && (
+                    <p className="mt-1 text-[11px] text-muted-foreground">{entry.duration}</p>
+                  )}
+                  <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+                    {entry.summary}
+                  </p>
+                  {entry.routeHint && (
+                    <div className="mt-4">
+                      <Link href={entry.routeHint} className="inline-flex items-center gap-1 text-xs font-medium text-accent">
+                        Open matching route
+                        <ArrowRight size={12} />
+                      </Link>
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
+        </motion.div>
+
+        <motion.div variants={fadeUp} custom={3} className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="bg-card border border-border rounded-2xl p-4 flex flex-col items-center text-center card-interactive">
             <ProgressRing value={overallScore} size={56} strokeWidth={5} />
             <p className="text-[11px] text-muted-foreground font-medium tracking-wide uppercase mt-2">Overall</p>
@@ -361,7 +417,7 @@ export default function HomePage() {
         </motion.div>
 
         {hasDiagnostic && revisitQueue.length > 0 && (
-          <motion.div variants={fadeUp} custom={3}>
+          <motion.div variants={fadeUp} custom={4}>
             <div className="mb-3 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Target size={15} className="text-accent" />
@@ -438,7 +494,7 @@ export default function HomePage() {
         )}
 
         {hasDiagnostic && (
-          <motion.div variants={fadeUp} custom={4}>
+          <motion.div variants={fadeUp} custom={5}>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <Sparkles size={15} className="text-accent" />
@@ -461,7 +517,7 @@ export default function HomePage() {
           </motion.div>
         )}
 
-        <motion.div variants={fadeUp} custom={5} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <motion.div variants={fadeUp} custom={6} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="bg-card border border-border rounded-2xl p-5 card-interactive">
             <div className="flex items-center gap-2 mb-3">
               <Target size={15} className="text-accent" />
@@ -513,7 +569,7 @@ export default function HomePage() {
           </div>
         </motion.div>
 
-        <motion.div variants={fadeUp} custom={6} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <motion.div variants={fadeUp} custom={7} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Link href="/revision" className="group">
             <Card hover className="h-full relative overflow-hidden">
               <div className="absolute top-0 right-0 w-24 h-24 bg-accent/4 rounded-full -translate-y-1/2 translate-x-1/2" />
@@ -552,7 +608,7 @@ export default function HomePage() {
           </Link>
         </motion.div>
 
-        <motion.div variants={fadeUp} custom={7}>
+        <motion.div variants={fadeUp} custom={8}>
           <div className="bg-card border border-border rounded-2xl p-5 card-interactive">
             <div className="flex items-center gap-2 mb-4">
               <Clock size={15} className="text-muted-foreground" />

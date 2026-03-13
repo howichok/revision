@@ -25,7 +25,7 @@ export default function WeakAreasPage() {
       <div className="space-y-6">
         <RevisionSubnav activeRoute="weak-areas" />
 
-        <div>
+        <Card variant="warning" className="p-5 sm:p-6">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Review and repeat
           </p>
@@ -36,12 +36,22 @@ export default function WeakAreasPage() {
             This route is for targeted repetition. It ranks topics by diagnostic weakness, practice gaps,
             review coverage, and recency so you know exactly what to revisit next.
           </p>
-        </div>
+        </Card>
 
         {revisitQueue.length > 0 ? (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {revisitQueue.map((item) => (
-              <Card key={item.topicId} className="h-full p-5">
+              <Card
+                key={item.topicId}
+                variant={
+                  item.urgency === "due-now"
+                    ? "danger"
+                    : item.urgency === "revisit-soon"
+                      ? "warning"
+                      : "success"
+                }
+                className="h-full p-5"
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2">
@@ -75,13 +85,13 @@ export default function WeakAreasPage() {
                 </div>
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-xl border border-border bg-surface/30 px-3 py-3">
+                  <div className="surface-cutout rounded-xl px-3 py-3">
                     <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                       Practice
                     </p>
                     <p className="mt-2 text-lg font-semibold text-foreground">{item.practicePercent}%</p>
                   </div>
-                  <div className="rounded-xl border border-border bg-surface/30 px-3 py-3">
+                  <div className="surface-cutout rounded-xl px-3 py-3">
                     <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                       Diagnostic
                     </p>
@@ -95,7 +105,7 @@ export default function WeakAreasPage() {
                   {item.reasons.map((reason) => (
                     <div
                       key={`${item.topicId}-${reason}`}
-                      className="rounded-xl border border-border bg-surface/20 px-3 py-2 text-xs text-muted-foreground"
+                      className="surface-cutout rounded-xl px-3 py-2 text-xs text-muted-foreground"
                     >
                       {reason}
                     </div>
@@ -119,7 +129,7 @@ export default function WeakAreasPage() {
             ))}
           </div>
         ) : diagnostic ? (
-          <Card className="p-5">
+          <Card variant="support" className="p-5">
             <p className="text-sm text-muted-foreground">
               No revisit queue has been generated yet. Start practice on any topic to build one.
             </p>
@@ -131,7 +141,7 @@ export default function WeakAreasPage() {
               const topicInfo = getTopicById(topic.category);
 
               return (
-                <Card key={topic.category} className="p-5">
+                <Card key={topic.category} variant="warning" className="p-5">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <p className="text-sm font-semibold text-foreground">
@@ -154,7 +164,7 @@ export default function WeakAreasPage() {
             })}
           </div>
         ) : (
-          <Card className="p-5">
+          <Card variant="support" className="p-5">
             <div className="flex items-center gap-2">
               <Target size={15} className="text-warning" />
               <p className="text-sm font-semibold text-foreground">No weak-area data yet</p>
@@ -176,4 +186,3 @@ export default function WeakAreasPage() {
     </PageContainer>
   );
 }
-

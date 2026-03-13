@@ -23,6 +23,15 @@ const SPELLING_NORMALIZATIONS: Array<[RegExp, string]> = [
   [/\bcentre\b/g, "center"],
   [/\bcentres\b/g, "centers"],
   [/\blicence\b/g, "license"],
+  [/\banalyse\b/g, "analyze"],
+  [/\banalysed\b/g, "analyzed"],
+  [/\banalysing\b/g, "analyzing"],
+  [/\bprioritise\b/g, "prioritize"],
+  [/\bprioritised\b/g, "prioritized"],
+  [/\bprioritising\b/g, "prioritizing"],
+  [/\boptimise\b/g, "optimize"],
+  [/\boptimised\b/g, "optimized"],
+  [/\boptimising\b/g, "optimizing"],
 ];
 
 function normalizeToken(token: string): string {

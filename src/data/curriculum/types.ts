@@ -29,6 +29,48 @@ export interface ContentSource {
   notes: string;
 }
 
+export interface QualificationComponent {
+  id: string;
+  title: string;
+  summary: string;
+  focus: string;
+  routeHint?: string;
+}
+
+export interface QualificationOverview {
+  id: string;
+  title: string;
+  level: string;
+  duration: string;
+  industryPlacement: string;
+  summary: string;
+  coreTopics: string[];
+  occupationalSpecialismTopics: string[];
+  assessmentComponents: QualificationComponent[];
+}
+
+export interface ExamGuideEntry {
+  id: string;
+  title: string;
+  series: string;
+  dateLabel: string;
+  isoDate?: string;
+  duration?: string;
+  summary: string;
+  routeHint?: string;
+  sourceId: string;
+  emphasis: "paper-1" | "paper-2" | "project" | "results" | "resit";
+}
+
+export interface ExamGuide {
+  id: string;
+  title: string;
+  summary: string;
+  caution: string;
+  sourceLabel: string;
+  entries: ExamGuideEntry[];
+}
+
 export interface CurriculumPoint {
   id: string;
   code: string;

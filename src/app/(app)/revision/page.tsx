@@ -8,6 +8,11 @@ import { RevisionSubnav } from "@/components/revision/revision-subnav";
 import { PracticeHub } from "@/components/revision/practice-hub";
 import { useAppData } from "@/components/providers/app-data-provider";
 import { Badge, Button, Card, ProgressBar } from "@/components/ui";
+import {
+  getExamGuide2026,
+  getOfficialGuidanceResources,
+  getQualificationOverview,
+} from "@/lib/content";
 import { formatRelativeTime, getWeakestTopics } from "@/lib/progress";
 
 const fadeUp = {
@@ -25,6 +30,9 @@ const fadeUp = {
 
 export default function RevisionPage() {
   const { activityHistory, diagnostic } = useAppData();
+  const qualificationOverview = getQualificationOverview();
+  const examGuide2026 = getExamGuide2026();
+  const officialResources = getOfficialGuidanceResources(2);
   const weakestTopics = getWeakestTopics(diagnostic, 3);
   const latestStructuredReport =
     diagnostic?.topicDiagnostics?.find((report) => report.topicId === diagnostic.latestTopicId) ??
@@ -51,41 +59,96 @@ export default function RevisionPage() {
               </p>
             </div>
 
-            <Card className="p-5">
-              <div className="flex items-center gap-2">
-                <BrainCircuit size={15} className="text-accent" />
-                <h2 className="text-sm font-semibold text-foreground">Latest snapshot</h2>
-              </div>
-              <div className="mt-4 space-y-3">
-                <div className="rounded-xl border border-border bg-surface/30 px-3 py-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    Overall score
-                  </p>
-                  <p className="mt-2 text-2xl font-bold text-foreground">
-                    {diagnostic?.overallScore ?? "\u2014"}{diagnostic ? "%" : ""}
-                  </p>
+            <div className="space-y-4">
+              <Card variant="support" className="p-5">
+                <div className="flex items-center gap-2">
+                  <BrainCircuit size={15} className="text-accent" />
+                  <h2 className="text-sm font-semibold text-foreground">Latest snapshot</h2>
                 </div>
-                {latestStructuredReport ? (
+                <div className="mt-4 space-y-3">
                   <div className="rounded-xl border border-border bg-surface/30 px-3 py-3">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                      Latest diagnostic topic
+                      Overall score
                     </p>
-                    <p className="mt-2 text-sm font-semibold text-foreground">
-                      {latestStructuredReport.topicLabel}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {latestStructuredReport.suggestedNextTargets[0] ?? "Ready for targeted practice."}
+                    <p className="mt-2 text-2xl font-bold text-foreground">
+                      {diagnostic?.overallScore ?? "\u2014"}{diagnostic ? "%" : ""}
                     </p>
                   </div>
-                ) : (
-                  <div className="rounded-xl border border-border bg-surface/30 px-3 py-3">
-                    <p className="text-sm text-muted-foreground">
-                      No structured diagnostic has been saved yet.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </Card>
+                  {latestStructuredReport ? (
+                    <div className="rounded-xl border border-border bg-surface/30 px-3 py-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                        Latest diagnostic topic
+                      </p>
+                      <p className="mt-2 text-sm font-semibold text-foreground">
+                        {latestStructuredReport.topicLabel}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {latestStructuredReport.suggestedNextTargets[0] ?? "Ready for targeted practice."}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-border bg-surface/30 px-3 py-3">
+                      <p className="text-sm text-muted-foreground">
+                        No structured diagnostic has been saved yet.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </Card>
+
+              <Card variant="navigation" className="p-5">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Official qualification map
+                </p>
+                <p className="mt-2 text-sm font-semibold text-foreground">
+                  {qualificationOverview.level} route with {qualificationOverview.industryPlacement.toLowerCase()}
+                </p>
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                  Use this app for revision by topic, paper, and weak area, but keep the official qualification shape in view: core digital knowledge, applied written work, and occupational-specialism delivery.
+                </p>
+                <div className="mt-4 space-y-2">
+                  {officialResources.map((resource) => (
+                    <a
+                      key={resource.id}
+                      href={resource.filePath}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center justify-between rounded-xl border border-border bg-surface/30 px-3 py-3 text-xs text-foreground transition-colors hover:border-accent/20 hover:bg-card"
+                    >
+                      <span>{resource.title}</span>
+                      <ArrowRight size={12} className="text-accent" />
+                    </a>
+                  ))}
+                </div>
+              </Card>
+
+              <Card variant="support" className="p-5">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  2026 exam dates
+                </p>
+                <div className="mt-3 space-y-2">
+                  {examGuide2026.entries.slice(0, 3).map((entry) => (
+                    <div key={entry.id} className="rounded-xl border border-border bg-surface/30 px-3 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-medium text-foreground">{entry.title}</p>
+                        <Badge
+                          variant={
+                            entry.emphasis === "paper-2"
+                              ? "paper-2"
+                              : entry.emphasis === "paper-1"
+                                ? "paper-1"
+                                : "default"
+                          }
+                        >
+                          {entry.series}
+                        </Badge>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">{entry.dateLabel}</p>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            </div>
           </div>
         </motion.div>
 
@@ -94,7 +157,7 @@ export default function RevisionPage() {
         </motion.div>
 
         <motion.div variants={fadeUp} custom={2} className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-          <Card className="p-5 sm:p-6">
+          <Card variant="support" className="p-5 sm:p-6">
             <div className="flex items-center gap-2">
               <TrendingUp size={15} className="text-warning" />
               <h2 className="text-sm font-semibold text-foreground">Weakest scored topics</h2>
@@ -143,7 +206,7 @@ export default function RevisionPage() {
             </div>
           </Card>
 
-          <Card className="p-5">
+          <Card variant="support" className="p-5">
             <div className="flex items-center gap-2">
               <Clock size={15} className="text-muted-foreground" />
               <h2 className="text-sm font-semibold text-foreground">Recent activity</h2>

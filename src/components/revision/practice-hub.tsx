@@ -48,13 +48,14 @@ function PracticePathCard({
     <Link href={href} className="group">
       <Card
         hover
-        className={`h-full overflow-hidden ${
+        variant={
           emphasis === "accent"
-            ? "border-accent/20 bg-[linear-gradient(145deg,rgba(139,92,246,0.16),rgba(17,17,19,0.96)_42%,rgba(17,17,19,1))]"
+            ? "accent"
             : emphasis === "warning"
-              ? "border-warning/20 bg-[linear-gradient(145deg,rgba(245,158,11,0.12),rgba(17,17,19,0.96)_42%,rgba(17,17,19,1))]"
-              : ""
-        }`}
+              ? "paper-2"
+              : "support"
+        }
+        className="h-full overflow-hidden"
       >
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           {eyebrow}
@@ -227,7 +228,7 @@ export function PracticeHub({ onOpenDiagnostic, compact = false }: PracticeHubPr
         </div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Link href="/revision/topics" className="group">
-            <Card hover className="h-full border-accent/20 bg-accent/10">
+            <Card hover variant="accent" className="h-full">
               <div className="flex h-full flex-col justify-between gap-4">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-accent">

@@ -20,6 +20,10 @@ import {
 } from "@/components/ui";
 import { PageContainer } from "@/components/layout/page-container";
 import {
+  getOfficialGuidanceResources,
+  getQualificationOverview,
+  getResourceHref,
+  isResourceExternal,
   getLibraryResources,
   searchLibraryResources,
   searchStructuredContent,
@@ -50,6 +54,8 @@ export default function LibraryPage() {
   const [activeType, setActiveType] = useState("all");
   const [activeTopic, setActiveTopic] = useState("all");
   const allResources = useMemo(() => getLibraryResources(), []);
+  const qualificationOverview = useMemo(() => getQualificationOverview(), []);
+  const officialResources = useMemo(() => getOfficialGuidanceResources(4), []);
   const topicSearch = useMemo(
     () =>
       searchTopicMetadata(search, {
@@ -109,7 +115,56 @@ export default function LibraryPage() {
           />
         </motion.div>
 
-        <motion.div variants={fadeUp} custom={2} className="grid gap-3 lg:grid-cols-3">
+        <motion.div variants={fadeUp} custom={2} className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="rounded-2xl border border-accent/20 bg-[linear-gradient(145deg,rgba(139,92,246,0.16),rgba(17,17,19,0.94)_48%,rgba(17,17,19,1))] p-5">
+            <div className="flex items-center gap-2">
+              <BookOpen size={15} className="text-accent" />
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-accent">
+                Official T Level DSD map
+              </p>
+            </div>
+            <h2 className="mt-3 text-xl font-semibold text-foreground">
+              Start from the live qualification structure, not random notes.
+            </h2>
+            <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">
+              The current Pearson route is a {qualificationOverview.level.toLowerCase()} {qualificationOverview.duration.toLowerCase()}
+              with a {qualificationOverview.industryPlacement.toLowerCase()}. Use the official overview first, then drop into topic practice, paper routes, and mapped resources.
+            </p>
+            <div className="mt-5 grid gap-3 md:grid-cols-3">
+              {qualificationOverview.assessmentComponents.map((component) => (
+                <div key={component.id} className="rounded-xl border border-white/10 bg-black/20 px-4 py-4">
+                  <p className="text-xs font-semibold text-foreground">{component.title}</p>
+                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{component.focus}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-border bg-card/70 p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Official web sources
+            </p>
+            <div className="mt-3 space-y-2">
+              {officialResources.slice(0, 3).map((resource) => (
+                <a
+                  key={resource.id}
+                  href={getResourceHref(resource)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-start justify-between gap-3 rounded-xl border border-border bg-surface/40 px-3 py-3 transition-colors hover:border-accent/20 hover:bg-card"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{resource.title}</p>
+                    <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{resource.summary}</p>
+                  </div>
+                  <ArrowRight size={14} className="mt-0.5 shrink-0 text-accent" />
+                </a>
+              ))}
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div variants={fadeUp} custom={3} className="grid gap-3 lg:grid-cols-3">
           {[
             {
               href: "/revision/quick-quiz",
@@ -148,7 +203,7 @@ export default function LibraryPage() {
         </motion.div>
 
         {/* Filters */}
-        <motion.div variants={fadeUp} custom={3} className="space-y-4">
+        <motion.div variants={fadeUp} custom={4} className="space-y-4">
           {/* Type filters */}
           <div className="flex gap-2 overflow-x-auto pb-1">
             {typeFilters.map(({ id, label, icon: Icon }) => (
@@ -196,7 +251,7 @@ export default function LibraryPage() {
         </motion.div>
 
         {/* Category summary cards */}
-        <motion.div variants={fadeUp} custom={4} className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <motion.div variants={fadeUp} custom={5} className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {[
             { label: "Past Papers", count: allResources.filter(r => r.displayType === "past-paper").length, icon: FileText, color: "text-accent" },
             { label: "Notes", count: allResources.filter(r => r.displayType === "notes").length, icon: BookOpen, color: "text-success" },
@@ -213,7 +268,7 @@ export default function LibraryPage() {
         </motion.div>
 
         {/* Resource grid */}
-        <motion.div variants={fadeUp} custom={5} className="space-y-4">
+        <motion.div variants={fadeUp} custom={6} className="space-y-4">
           {search && (
             <div className="grid gap-4 xl:grid-cols-4">
               <div className="rounded-2xl border border-border bg-card/70 p-4">
@@ -375,6 +430,9 @@ export default function LibraryPage() {
                       topicIcon={topicData?.icon}
                       year={resource.year}
                       index={i}
+                      href={getResourceHref(resource)}
+                      external={isResourceExternal(resource)}
+                      actionLabel={isResourceExternal(resource) ? "Open official source" : undefined}
                     />
                   );
                 })}

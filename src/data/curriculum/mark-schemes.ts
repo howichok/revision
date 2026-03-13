@@ -93,4 +93,20 @@ export const MARK_SCHEME_CONCEPTS: MarkSchemeConceptMetadata[] = [
     curriculumPointIds: ["dsd-1.4", "dsd-2.2", "dsd-4.3", "dsd-8.2"],
     legacyTopicIds: ["business", "data", "security", "digital-environments"],
   },
+  {
+    id: "ms-paper2-2023-q3-service-quality",
+    sourceId: "mark-scheme-summer-2022",
+    title: "Keeping a digital service useful for its users",
+    summary:
+      "Credit answers that identify one practical feedback or monitoring method, explain how the team uses that evidence to understand changing user needs, and show how that leads to useful service improvements.",
+    conceptTargets: [
+      "collect user feedback or usability evidence regularly",
+      "analyze how users behave or what they report",
+      "identify changing user needs, pain points, or valuable improvements",
+      "prioritize updates or refinements based on the evidence",
+      "keep the service useful, relevant, usable, or valuable for users",
+    ],
+    curriculumPointIds: ["dsd-1.4", "dsd-4.3", "dsd-6.2"],
+    legacyTopicIds: ["business"],
+  },
 ];

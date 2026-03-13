@@ -26,7 +26,7 @@ export default function RevisionProgressPage() {
       <div className="space-y-6">
         <RevisionSubnav activeRoute="progress" />
 
-        <div>
+        <Card variant="support" className="p-5 sm:p-6">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Progress
           </p>
@@ -37,10 +37,10 @@ export default function RevisionProgressPage() {
             This route is for summary, not task execution. Use it to read your saved diagnostic state,
             practice progress, and recent activity without mixing it into diagnostic or practice flows.
           </p>
-        </div>
+        </Card>
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <Card className="p-5">
+          <Card variant="support" className="p-5">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
               Overall diagnostic
             </p>
@@ -48,7 +48,7 @@ export default function RevisionProgressPage() {
               {diagnostic?.overallScore ?? "\u2014"}{diagnostic ? "%" : ""}
             </p>
           </Card>
-          <Card className="p-5">
+          <Card variant="support" className="p-5">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
               Topics covered
             </p>
@@ -56,13 +56,13 @@ export default function RevisionProgressPage() {
               {getStudiedTopicCount(diagnostic)}
             </p>
           </Card>
-          <Card className="p-5">
+          <Card variant="support" className="p-5">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
               Practice sets saved
             </p>
             <p className="mt-3 text-3xl font-bold text-foreground">{practiceEntries.length}</p>
           </Card>
-          <Card className="p-5">
+          <Card variant="support" className="p-5">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
               Time this week
             </p>
@@ -73,7 +73,7 @@ export default function RevisionProgressPage() {
         </div>
 
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-          <Card className="p-5 sm:p-6">
+          <Card variant="navigation" className="p-5 sm:p-6">
             <div className="flex items-center gap-2">
               <BarChart3 size={15} className="text-accent" />
               <h2 className="text-sm font-semibold text-foreground">Topic performance</h2>
@@ -88,7 +88,7 @@ export default function RevisionProgressPage() {
                     return (
                       <div
                         key={topic.category}
-                        className="rounded-xl border border-border bg-surface/30 px-4 py-4"
+                        className="surface-cutout rounded-xl px-4 py-4"
                       >
                         <div className="flex items-center justify-between gap-3">
                           <div className="flex items-center gap-2">
@@ -122,7 +122,7 @@ export default function RevisionProgressPage() {
           </Card>
 
           <div className="space-y-4">
-            <Card className="p-5">
+            <Card variant="warning" className="p-5">
               <div className="flex items-center gap-2">
                 <TrendingUp size={15} className="text-warning" />
                 <h2 className="text-sm font-semibold text-foreground">Weakest topics</h2>
@@ -148,19 +148,19 @@ export default function RevisionProgressPage() {
               </div>
             </Card>
 
-            <Card className="p-5">
+            <Card variant="support" className="p-5">
               <div className="flex items-center gap-2">
                 <Target size={15} className="text-accent" />
                 <h2 className="text-sm font-semibold text-foreground">Saved activity</h2>
               </div>
               <div className="mt-4 space-y-3">
-                <div className="rounded-xl border border-border bg-surface/30 px-3 py-3">
+                <div className="surface-cutout rounded-xl px-3 py-3">
                   <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                     Subtopic reviews
                   </p>
                   <p className="mt-2 text-lg font-semibold text-foreground">{subtopicEntries.length}</p>
                 </div>
-                <div className="rounded-xl border border-border bg-surface/30 px-3 py-3">
+                <div className="surface-cutout rounded-xl px-3 py-3">
                   <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                     Practice sets
                   </p>
@@ -169,7 +169,7 @@ export default function RevisionProgressPage() {
               </div>
             </Card>
 
-            <Card className="p-5">
+            <Card variant="support" className="p-5">
               <div className="flex items-center gap-2">
                 <Clock size={15} className="text-muted-foreground" />
                 <h2 className="text-sm font-semibold text-foreground">Recent activity</h2>
@@ -178,7 +178,7 @@ export default function RevisionProgressPage() {
                 {activityHistory.slice(0, 5).map((item) => (
                   <div
                     key={item.id}
-                    className="rounded-xl border border-border bg-surface/30 px-3 py-3"
+                    className="surface-cutout rounded-xl px-3 py-3"
                   >
                     <p className="text-sm text-foreground">{item.title}</p>
                     <p className="mt-1 text-xs text-muted-foreground">

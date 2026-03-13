@@ -23,6 +23,72 @@ export const CONTENT_SOURCES: ContentSource[] = [
       "Duplicate copy of the 2025 Digital Software Development specification kept in the exams folder.",
   },
   {
+    id: "pearson-dsd-qualification-page",
+    title: "Pearson Qualification Page: Digital Software Development",
+    kind: "specification",
+    classification: "primary",
+    filePath:
+      "https://qualifications.pearson.com/en/qualifications/t-levels/digital-software-development.html",
+    year: 2025,
+    notes:
+      "Official qualification landing page for the Pearson T Level in Digital Software Development. Useful for the live qualification overview and official web context alongside the specification PDF.",
+  },
+  {
+    id: "pearson-dsd-qualification-description",
+    title: "Pearson Qualification Description PDF",
+    kind: "specification",
+    classification: "primary",
+    filePath:
+      "https://qualifications.pearson.com/content/dam/pdf/T%20Levels/Digital%20Software%20Development/Technical%20Qualification/Pearson-TQ-Digital-Software-Development_Qualification-Description.pdf",
+    year: 2025,
+    notes:
+      "Official qualification description PDF covering the programme shape, core component context, occupational specialism expectations, and qualification overview.",
+  },
+  {
+    id: "tlevels-student-dsd-page",
+    title: "T Levels Student Page: Digital Software Development",
+    kind: "specification",
+    classification: "secondary",
+    filePath:
+      "https://www.tlevels.gov.uk/students/subjects/digital-software-development",
+    year: 2025,
+    notes:
+      "Student-facing overview of the Digital Software Development T Level, including the broad qualification shape, progression context, and high-level route explanation.",
+  },
+  {
+    id: "tlevels-support-dsd-page",
+    title: "T Levels Support: Digital Software Development",
+    kind: "textbook",
+    classification: "secondary",
+    filePath:
+      "https://support.tlevels.gov.uk/hc/en-gb/articles/13813213896210-Digital-Production-Design-and-Development-now-T-Level-in-Digital-Software-Development",
+    year: 2025,
+    notes:
+      "Official provider-support article explaining the Digital Software Development naming update and linking out to teaching, learning, and support materials.",
+  },
+  {
+    id: "tlevels-update-march-2025",
+    title: "T Level Update March 2025",
+    kind: "textbook",
+    classification: "secondary",
+    filePath:
+      "https://support.tlevels.gov.uk/hc/en-gb/articles/25130056060434-T-Level-update-March-2025",
+    year: 2025,
+    notes:
+      "Official update article explaining the March 2025 transition messaging and streamlining around the Digital Software Development route.",
+  },
+  {
+    id: "pearson-dsd-course-materials",
+    title: "Pearson Course Materials Page: Digital Software Development",
+    kind: "textbook",
+    classification: "secondary",
+    filePath:
+      "https://qualifications.pearson.com/en/qualifications/t-levels/digital-software-development.coursematerials.html",
+    year: 2025,
+    notes:
+      "Official course materials page. Useful operationally because it currently indicates that course materials are not yet listed there, which affects where support content must be sourced from.",
+  },
+  {
     id: "dpdd-core-book-2023",
     title: "Digital Production, Design and Development T Level: Core",
     kind: "textbook",

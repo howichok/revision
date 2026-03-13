@@ -1,4 +1,9 @@
+import { TOPICS } from "@/lib/types";
+import { DSD_CURRICULUM_POINTS } from "./curriculum";
 import type { ContentResource } from "./types";
+
+const ALL_POINT_IDS = DSD_CURRICULUM_POINTS.map((point) => point.id);
+const ALL_TOPIC_IDS = TOPICS.filter((topic) => topic.id !== "esp").map((topic) => topic.id);
 
 export const CONTENT_RESOURCES: ContentResource[] = [
   {
@@ -48,6 +53,81 @@ export const CONTENT_RESOURCES: ContentResource[] = [
     ],
     tags: ["official", "specification", "curriculum", "digital software development"],
     estimatedMinutes: 20,
+  },
+  {
+    id: "resource-dsd-qualification-page",
+    title: "Official Pearson Qualification Page",
+    kind: "specification",
+    displayType: "notes",
+    sourceId: "pearson-dsd-qualification-page",
+    filePath:
+      "https://qualifications.pearson.com/en/qualifications/t-levels/digital-software-development.html",
+    summary:
+      "Live qualification overview page for the Pearson T Level in Digital Software Development. Use this for the current qualification framing, linked official downloads, and route-level context.",
+    curriculumPointIds: ALL_POINT_IDS,
+    legacyTopicIds: ALL_TOPIC_IDS,
+    tags: ["official", "pearson", "qualification", "overview", "t level"],
+    estimatedMinutes: 8,
+  },
+  {
+    id: "resource-dsd-qualification-description",
+    title: "Official Qualification Description PDF",
+    kind: "specification",
+    displayType: "notes",
+    sourceId: "pearson-dsd-qualification-description",
+    filePath:
+      "https://qualifications.pearson.com/content/dam/pdf/T%20Levels/Digital%20Software%20Development/Technical%20Qualification/Pearson-TQ-Digital-Software-Development_Qualification-Description.pdf",
+    summary:
+      "Official qualification description covering the programme shape, core component context, occupational specialism, and qualification structure.",
+    curriculumPointIds: ALL_POINT_IDS,
+    legacyTopicIds: ALL_TOPIC_IDS,
+    tags: ["official", "pearson", "qualification description", "assessment", "occupational specialism"],
+    estimatedMinutes: 12,
+  },
+  {
+    id: "resource-dsd-student-overview",
+    title: "Student Guide: T Level Digital Software Development",
+    kind: "specification",
+    displayType: "notes",
+    sourceId: "tlevels-student-dsd-page",
+    filePath:
+      "https://www.tlevels.gov.uk/students/subjects/digital-software-development",
+    summary:
+      "Student-facing overview of what the Digital Software Development T Level covers, how it is structured, and where it can lead next.",
+    curriculumPointIds: ALL_POINT_IDS,
+    legacyTopicIds: ALL_TOPIC_IDS,
+    tags: ["official", "student guide", "t levels", "progression", "overview"],
+    estimatedMinutes: 6,
+  },
+  {
+    id: "resource-dsd-support-materials",
+    title: "Official DSD Support and Teaching Materials",
+    kind: "textbook",
+    displayType: "notes",
+    sourceId: "tlevels-support-dsd-page",
+    filePath:
+      "https://support.tlevels.gov.uk/hc/en-gb/articles/13813213896210-Digital-Production-Design-and-Development-now-T-Level-in-Digital-Software-Development",
+    summary:
+      "Official support page linking to teaching and learning materials, curriculum support, and route-specific updates for Digital Software Development.",
+    curriculumPointIds: ALL_POINT_IDS,
+    legacyTopicIds: ALL_TOPIC_IDS,
+    tags: ["official", "support", "provider guidance", "teaching materials", "digital software development"],
+    estimatedMinutes: 10,
+  },
+  {
+    id: "resource-dsd-update-march-2025",
+    title: "Official March 2025 Update on the DSD Route",
+    kind: "textbook",
+    displayType: "notes",
+    sourceId: "tlevels-update-march-2025",
+    filePath:
+      "https://support.tlevels.gov.uk/hc/en-gb/articles/25130056060434-T-Level-update-March-2025",
+    summary:
+      "Official update explaining the Digital Software Development route naming change and the streamlining work around the post-2025 transition.",
+    curriculumPointIds: ALL_POINT_IDS,
+    legacyTopicIds: ALL_TOPIC_IDS,
+    tags: ["official", "2025 update", "route change", "naming", "streamlined content"],
+    estimatedMinutes: 5,
   },
   {
     id: "resource-dpdd-core-book-problem-solving",

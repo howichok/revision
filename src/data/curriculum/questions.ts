@@ -224,7 +224,126 @@ export const QUESTION_METADATA: QuestionMetadata[] = [
     legacyTopicIds: ["business"],
     practicePrompt:
       "Explain one practical way a team can make sure a digital service stays useful for its users.",
-    markSchemeConceptIds: ["ms-general-linked-explanation"],
+    markSchemeConceptIds: [
+      "ms-paper2-2023-q3-service-quality",
+      "ms-general-linked-explanation",
+    ],
+    evaluationProfile: {
+      depthExpectation: "explained",
+      strongAnswerGuidance:
+        "A strong answer names one practical way the team gathers evidence from users or service behaviour, explains how that evidence reveals changing needs, and links it to prioritising useful updates.",
+      slots: [
+        {
+          id: "practical-method",
+          label: "A practical method for gathering user evidence is identified",
+          weight: 1.5,
+          minimumGroups: 1,
+          groups: [
+            {
+              anyOf: [
+                "user feedback",
+                "feedback loop",
+                "continuous feedback loop",
+                "collect feedback",
+                "usability testing",
+                "user testing",
+                "user research",
+                "survey users",
+                "interview users",
+                "analyze usage data",
+                "analyse usage data",
+                "analytics",
+                "monitor usage",
+                "support tickets",
+                "customer feedback",
+              ],
+            },
+          ],
+          missingFeedback:
+            "Name one practical method the team can use, such as feedback, usability testing, support tickets, or usage analytics.",
+        },
+        {
+          id: "understand-needs",
+          label: "The evidence is used to understand user needs or pain points",
+          weight: 1.2,
+          minimumGroups: 1,
+          groups: [
+            {
+              anyOf: [
+                "user needs",
+                "changing user needs",
+                "what users need",
+                "what users think",
+                "what users say",
+                "user feedback",
+                "pain point",
+                "problem users face",
+                "where users struggle",
+                "how people use the service",
+                "user behavior",
+                "user behaviour",
+                "identify needs",
+                "identify problems",
+                "review what users want",
+              ],
+            },
+          ],
+          missingFeedback:
+            "Explain how the team uses that evidence to see what users need, where they struggle, or what has changed.",
+        },
+        {
+          id: "turn-findings-into-updates",
+          label: "Findings are turned into updates or improvements",
+          weight: 1.3,
+          minimumGroups: 1,
+          groups: [
+            {
+              anyOf: [
+                "prioritize updates",
+                "prioritise updates",
+                "make improvements",
+                "improve the service",
+                "update the service",
+                "refine the service",
+                "iterate",
+                "deliver useful updates",
+                "fix issues",
+                "change the service",
+                "make changes",
+              ],
+            },
+          ],
+          missingFeedback:
+            "Show that the team acts on what it learns by prioritising updates, fixes, or improvements.",
+        },
+        {
+          id: "service-usefulness-outcome",
+          label: "The answer links the action to keeping the service useful",
+          weight: 1,
+          minimumGroups: 1,
+          groups: [
+            {
+              anyOf: [
+                "stays useful",
+                "stay useful",
+                "remains useful",
+                "useful for its users",
+                "meet user needs",
+                "meets user needs",
+                "stays relevant",
+                "deliver value",
+                "quality service",
+                "better user experience",
+                "keep users satisfied",
+                "stays usable",
+              ],
+            },
+          ],
+          missingFeedback:
+            "Link the practical method back to the outcome: the service stays useful, relevant, usable, or aligned with user needs.",
+        },
+      ],
+    },
   },
   {
     id: "paper2-2023-q4c-firewall",

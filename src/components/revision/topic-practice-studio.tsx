@@ -87,7 +87,7 @@ export function TopicPracticeStudio({
 
   return (
     <div className="space-y-6">
-      <Card className="p-5 sm:p-6">
+      <Card variant="accent" className="p-5 sm:p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
@@ -110,10 +110,18 @@ export function TopicPracticeStudio({
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {modeCards.map((mode) => {
           const Icon = mode.icon;
+          const cardVariant =
+            mode.tone === "warning"
+              ? "warning"
+              : mode.tone === "success"
+                ? "success"
+                : mode.tone === "accent"
+                  ? "accent"
+                  : "support";
 
           return (
             <Link key={mode.href} href={mode.href} className="group">
-              <Card hover className="h-full p-5">
+              <Card hover variant={cardVariant} className="h-full p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
@@ -144,7 +152,7 @@ export function TopicPracticeStudio({
                 </div>
 
                 {typeof mode.progress === "number" && (
-                  <div className="mt-5 rounded-2xl border border-border bg-surface/30 px-4 py-3">
+                  <div className="mt-5 rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
                       <span>Saved progress</span>
                       <span>{mode.progress}%</span>
@@ -160,4 +168,3 @@ export function TopicPracticeStudio({
     </div>
   );
 }
-

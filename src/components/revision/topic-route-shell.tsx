@@ -21,6 +21,21 @@ interface TopicRouteShellProps {
   aside?: React.ReactNode;
 }
 
+const modeToneMap: Record<
+  TopicLearningMode,
+  { shellVariant: "navigation" | "accent" | "warning" | "support" | "success"; badgeVariant: "accent" | "warning" | "default" | "success" }
+> = {
+  overview: { shellVariant: "navigation", badgeVariant: "default" },
+  practice: { shellVariant: "accent", badgeVariant: "accent" },
+  recall: { shellVariant: "accent", badgeVariant: "accent" },
+  "exam-drill": { shellVariant: "warning", badgeVariant: "warning" },
+  "answer-check": { shellVariant: "success", badgeVariant: "success" },
+  quiz: { shellVariant: "accent", badgeVariant: "accent" },
+  "exam-questions": { shellVariant: "warning", badgeVariant: "warning" },
+  resources: { shellVariant: "support", badgeVariant: "default" },
+  progress: { shellVariant: "support", badgeVariant: "success" },
+};
+
 function getScoreVariant(pct: number): "success" | "warning" | "danger" {
   if (pct >= 75) return "success";
   if (pct >= 50) return "warning";
@@ -50,12 +65,13 @@ export function TopicRouteShell({
     : null;
   const progress = getSubtopicProgressForTopic(revisionProgress, topicId);
   const topicRoutes = getTopicRouteItems(topicId);
+  const tone = modeToneMap[activeMode];
 
   return (
     <div className="space-y-6">
       <RevisionSubnav activeRoute="topics" />
 
-      <div className="space-y-4 rounded-[28px] border border-border bg-card/80 p-5 sm:p-6">
+      <Card variant={tone.shellVariant} className="space-y-4 rounded-[28px] p-5 sm:p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-3">
             <Link href="/revision/topics" className="inline-flex">
@@ -72,6 +88,9 @@ export function TopicRouteShell({
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                   {eyebrow}
                 </p>
+                <div className="mt-2">
+                  <Badge variant={tone.badgeVariant}>{activeMode.replace("-", " ")}</Badge>
+                </div>
                 <h1 className="mt-1 text-2xl font-bold text-foreground sm:text-3xl">
                   {title}
                 </h1>
@@ -83,7 +102,7 @@ export function TopicRouteShell({
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <Card className="min-w-[180px] p-4">
+            <Card variant="support" className="min-w-[180px] p-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 Diagnostic score
               </p>
@@ -97,7 +116,7 @@ export function TopicRouteShell({
               </div>
             </Card>
 
-            <Card className="min-w-[180px] p-4">
+            <Card variant="support" className="min-w-[180px] p-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 Topic progress
               </p>
@@ -111,7 +130,7 @@ export function TopicRouteShell({
         </div>
 
         <div className="overflow-x-auto">
-          <div className="flex min-w-max gap-2 rounded-2xl border border-border bg-surface/30 p-2">
+          <div className="flex min-w-max gap-2 rounded-2xl border border-white/8 bg-black/20 p-2">
             {topicRoutes.map((item) => {
               const isActive = item.id === activeMode || pathname === item.href;
 
@@ -122,8 +141,12 @@ export function TopicRouteShell({
                   className={cn(
                     "rounded-xl px-3 py-2 text-sm transition-colors",
                     isActive
-                      ? "bg-accent/10 text-accent"
-                      : "text-muted-foreground hover:bg-card hover:text-foreground"
+                      ? tone.badgeVariant === "warning"
+                        ? "bg-warning/15 text-warning"
+                        : tone.badgeVariant === "success"
+                          ? "bg-success/15 text-success"
+                          : "bg-accent/10 text-accent"
+                      : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
                   )}
                 >
                   <span className="block font-medium">{item.label}</span>
@@ -135,7 +158,7 @@ export function TopicRouteShell({
             })}
           </div>
         </div>
-      </div>
+      </Card>
 
       {aside ? (
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">

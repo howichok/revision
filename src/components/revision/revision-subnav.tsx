@@ -14,7 +14,7 @@ export function RevisionSubnav({ activeRoute }: RevisionSubnavProps) {
 
   return (
     <div className="overflow-x-auto">
-      <div className="flex min-w-max gap-2 rounded-2xl border border-border bg-card/70 p-2">
+      <div className="flex min-w-max gap-2 rounded-2xl border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(17,17,19,0.88))] p-2 shadow-[0_16px_40px_-30px_rgba(0,0,0,0.9)]">
         {REVISION_ROUTE_ITEMS.map((item) => {
           const isActive =
             activeRoute
@@ -30,8 +30,12 @@ export function RevisionSubnav({ activeRoute }: RevisionSubnavProps) {
               className={cn(
                 "rounded-xl px-3 py-2 text-sm transition-colors",
                 isActive
-                  ? "bg-accent/10 text-accent"
-                  : "text-muted-foreground hover:bg-surface/60 hover:text-foreground"
+                  ? item.id === "paper-2"
+                    ? "bg-warning/15 text-warning"
+                    : item.id === "progress"
+                      ? "bg-success/15 text-success"
+                      : "bg-accent/10 text-accent"
+                  : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
               )}
             >
               <span className="block font-medium">{item.label}</span>
