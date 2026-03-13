@@ -7,6 +7,8 @@ export { QUESTION_METADATA } from "./questions";
 export { CONTENT_RESOURCES } from "./resources";
 export { CONTENT_SOURCES } from "./sources";
 export type {
+  AnswerRubricSignalGroup,
+  AnswerRubricSlot,
   ContentResource,
   ContentSource,
   CurriculumArea,
@@ -14,6 +16,7 @@ export type {
   GlossaryTerm,
   LegacyTopicMapping,
   MarkSchemeConceptMetadata,
+  QuestionEvaluationProfile,
   QuestionMetadata,
   RecommendedMaterial,
   StructuredSearchResults,

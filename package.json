@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "seed:curriculum": "tsx scripts/sync-curriculum-seed.ts"
+    "seed:curriculum": "tsx scripts/sync-curriculum-seed.ts",
+    "test:evaluator": "node --test --import tsx src/lib/practice-evaluator.test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.9.0",

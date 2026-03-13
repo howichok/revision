@@ -60,6 +60,25 @@ export interface GlossaryTerm {
   legacyTopicIds: TopicId[];
 }
 
+export interface AnswerRubricSignalGroup {
+  anyOf: string[];
+}
+
+export interface AnswerRubricSlot {
+  id: string;
+  label: string;
+  weight: number;
+  minimumGroups?: number;
+  groups: AnswerRubricSignalGroup[];
+  missingFeedback: string;
+}
+
+export interface QuestionEvaluationProfile {
+  depthExpectation?: "brief" | "explained" | "developed";
+  strongAnswerGuidance?: string;
+  slots: AnswerRubricSlot[];
+}
+
 export interface ContentResource {
   id: string;
   title: string;
@@ -97,6 +116,7 @@ export interface QuestionMetadata {
   legacyTopicIds: TopicId[];
   practicePrompt: string;
   markSchemeConceptIds: string[];
+  evaluationProfile?: QuestionEvaluationProfile;
 }
 
 export interface MarkSchemeConceptMetadata {

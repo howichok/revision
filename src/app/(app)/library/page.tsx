@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
+  ArrowRight,
   FileText,
   BookOpen,
   Video,
@@ -107,8 +109,46 @@ export default function LibraryPage() {
           />
         </motion.div>
 
+        <motion.div variants={fadeUp} custom={2} className="grid gap-3 lg:grid-cols-3">
+          {[
+            {
+              href: "/revision/quick-quiz",
+              title: "Quick Quiz",
+              description: "Use fast retrieval if you want to test yourself instead of browsing.",
+            },
+            {
+              href: "/revision/paper-1",
+              title: "Paper 1 practice",
+              description: "Go straight into theory-heavy checks and faster recall.",
+            },
+            {
+              href: "/revision/paper-2",
+              title: "Paper 2 practice",
+              description: "Jump into applied exam-style questions and longer responses.",
+            },
+          ].map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="group rounded-2xl border border-border bg-card/70 px-4 py-4 transition-colors hover:border-accent/20 hover:bg-card"
+            >
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Practice route
+                </p>
+              <p className="mt-2 text-sm font-semibold text-foreground">{item.title}</p>
+              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                {item.description}
+              </p>
+              <div className="mt-4 flex items-center gap-1 text-xs font-medium text-accent">
+                Open route
+                <ArrowRight size={12} className="transition-transform group-hover:translate-x-0.5" />
+              </div>
+            </Link>
+          ))}
+        </motion.div>
+
         {/* Filters */}
-        <motion.div variants={fadeUp} custom={2} className="space-y-4">
+        <motion.div variants={fadeUp} custom={3} className="space-y-4">
           {/* Type filters */}
           <div className="flex gap-2 overflow-x-auto pb-1">
             {typeFilters.map(({ id, label, icon: Icon }) => (
@@ -156,7 +196,7 @@ export default function LibraryPage() {
         </motion.div>
 
         {/* Category summary cards */}
-        <motion.div variants={fadeUp} custom={3} className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <motion.div variants={fadeUp} custom={4} className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {[
             { label: "Past Papers", count: allResources.filter(r => r.displayType === "past-paper").length, icon: FileText, color: "text-accent" },
             { label: "Notes", count: allResources.filter(r => r.displayType === "notes").length, icon: BookOpen, color: "text-success" },
@@ -173,7 +213,7 @@ export default function LibraryPage() {
         </motion.div>
 
         {/* Resource grid */}
-        <motion.div variants={fadeUp} custom={4} className="space-y-4">
+        <motion.div variants={fadeUp} custom={5} className="space-y-4">
           {search && (
             <div className="grid gap-4 xl:grid-cols-4">
               <div className="rounded-2xl border border-border bg-card/70 p-4">

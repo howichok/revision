@@ -12,6 +12,19 @@ const CONTRACTIONS: Array<[RegExp, string]> = [
   [/\byou're\b/g, "you are"],
 ];
 
+const SPELLING_NORMALIZATIONS: Array<[RegExp, string]> = [
+  [/\bunauthorised\b/g, "unauthorized"],
+  [/\bauthorised\b/g, "authorized"],
+  [/\bauthorisation\b/g, "authorization"],
+  [/\borganisation\b/g, "organization"],
+  [/\borganisations\b/g, "organizations"],
+  [/\bbehaviour\b/g, "behavior"],
+  [/\bcolour\b/g, "color"],
+  [/\bcentre\b/g, "center"],
+  [/\bcentres\b/g, "centers"],
+  [/\blicence\b/g, "license"],
+];
+
 function normalizeToken(token: string): string {
   if (token.length <= 3) {
     return token;
@@ -44,6 +57,10 @@ export function normalizeString(input: string): string {
   let normalized = input.toLowerCase().normalize("NFKD");
 
   for (const [pattern, replacement] of CONTRACTIONS) {
+    normalized = normalized.replace(pattern, replacement);
+  }
+
+  for (const [pattern, replacement] of SPELLING_NORMALIZATIONS) {
     normalized = normalized.replace(pattern, replacement);
   }
 

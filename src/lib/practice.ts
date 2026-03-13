@@ -7,11 +7,11 @@ import {
   getMarkSchemeConceptsForQuestion,
   getTopicContentBundle,
 } from "./content";
-import { findPhraseEvidence, stringSimilarity, tokenOverlapScore } from "./intelligence/fuzzy";
-import { normalizeText } from "./intelligence/normalize";
 import { getTopicById, getTopicTree, TOPICS } from "./types";
 
 export type PracticeSetKind = "recall" | "exam-drill" | "quiz";
+export type PracticePaper = "Paper 1" | "Paper 2";
+export type PracticePathId = "mixed" | "paper-1" | "paper-2";
 
 export interface PracticeRecallCard {
   id: string;
@@ -33,6 +33,7 @@ export interface PracticeExamDrill {
   questionId: string;
   title: string;
   sourceLabel: string;
+  paper?: PracticePaper;
   marks?: number;
   prompt: string;
   answerFocus: string;
@@ -53,6 +54,8 @@ export interface PracticeQuizQuestion {
   difficulty: "easy" | "medium" | "hard";
   subtopicLabel?: string;
   sourceLabel?: string;
+  paper?: PracticePaper;
+  evaluationProfile?: QuestionMetadata["evaluationProfile"];
 }
 
 export interface PracticeResourceStep {
@@ -71,14 +74,45 @@ export interface TopicPracticeBundle {
   resourceSteps: PracticeResourceStep[];
 }
 
-export interface PracticeShortAnswerCheckResult {
-  isCorrect: boolean;
-  matchedCue: string | null;
-  confidence: number;
+export interface PracticePathSummary {
+  id: PracticePathId;
+  title: string;
+  eyebrow: string;
+  description: string;
+  questionCount: number;
+  examDrillCount: number;
+  topicCount: number;
+  relatedTopicIds: string[];
+  startLabel: string;
+  statLabel: string;
+  purpose: string;
+  paper?: PracticePaper;
 }
 
 function uniqueStrings(values: Array<string | undefined | null>) {
   return [...new Set(values.map((value) => value?.trim()).filter(Boolean))] as string[];
+}
+
+function dedupeById<T extends { id: string }>(values: T[]) {
+  return Array.from(new Map(values.map((value) => [value.id, value])).values());
+}
+
+function inferQuestionPaper(question: QuestionMetadata): PracticePaper | undefined {
+  if (question.paper === "Paper 1" || question.paper === "Paper 2") {
+    return question.paper;
+  }
+
+  const sourceLabel = question.sourceLabel.toLowerCase();
+
+  if (sourceLabel.includes("paper 1")) {
+    return "Paper 1";
+  }
+
+  if (sourceLabel.includes("paper 2")) {
+    return "Paper 2";
+  }
+
+  return undefined;
 }
 
 function getTopicSubtopicLabel(topicId: string, index = 0) {
@@ -136,6 +170,7 @@ function buildTermMultipleChoiceQuestion(
     difficulty: "easy",
     subtopicLabel: getTopicSubtopicLabel(topicId),
     sourceLabel: "Glossary recall",
+    paper: "Paper 1",
   };
 }
 
@@ -174,6 +209,7 @@ function buildSubtopicQuestion(topicId: string): PracticeQuizQuestion[] {
       difficulty: index > 1 ? "medium" : "easy",
       subtopicLabel: subtopic.label,
       sourceLabel: "Topic coverage",
+      paper: "Paper 1",
     };
   });
 }
@@ -214,6 +250,8 @@ function buildExamPromptQuestion(
           : "easy",
     subtopicLabel: getTopicSubtopicLabel(topicId, 1),
     sourceLabel: question.sourceLabel,
+    paper: inferQuestionPaper(question),
+    evaluationProfile: question.evaluationProfile,
   };
 }
 
@@ -378,6 +416,7 @@ export function getTopicPracticeBundle(topicId: string): TopicPracticeBundle {
               : difficulty.difficulty,
           subtopicLabel: `${point.code} ${point.title}`,
           sourceLabel: "Official point drill",
+          paper: "Paper 1" as const,
         };
       })
     ),
@@ -403,6 +442,7 @@ export function getTopicPracticeBundle(topicId: string): TopicPracticeBundle {
       questionId: question.id,
       title: question.title,
       sourceLabel: question.sourceLabel,
+      paper: inferQuestionPaper(question),
       marks: question.marks,
       prompt: question.practicePrompt,
       answerFocus: question.expectation,
@@ -429,6 +469,7 @@ export function getTopicPracticeBundle(topicId: string): TopicPracticeBundle {
         questionId: `point-${point.id}-${index + 1}`,
         title: `${point.code} ${point.title}`,
         sourceLabel: `Official point ${point.code}`,
+        paper: "Paper 1" as const,
         marks: promptMeta.marks,
         prompt,
         answerFocus: point.summary,
@@ -454,77 +495,108 @@ export function getTopicPracticeBundle(topicId: string): TopicPracticeBundle {
 }
 
 export function getQuickQuizQuestionPool(topicId?: string) {
-  if (topicId) {
-    return getTopicPracticeBundle(topicId).quizQuestions;
-  }
-
-  return TOPICS.filter((topic) => topic.id !== "esp").flatMap((topic) =>
-    getTopicPracticeBundle(topic.id).quizQuestions
+  return getFilteredQuickQuizQuestionPool(
+    topicId ? { topicId } : undefined
   );
 }
 
-export function evaluatePracticeShortAnswer(
-  answer: string,
-  question: PracticeQuizQuestion
-): PracticeShortAnswerCheckResult {
-  const normalizedAnswer = normalizeText(answer);
+interface QuickQuizPoolOptions {
+  topicId?: string;
+  paper?: PracticePaper;
+  topicIds?: string[];
+}
 
-  if (!normalizedAnswer.normalized) {
+export function getFilteredQuickQuizQuestionPool(options: QuickQuizPoolOptions = {}) {
+  const topicIds = options.topicIds?.length
+    ? options.topicIds
+    : options.topicId
+      ? [options.topicId]
+      : TOPICS.filter((topic) => topic.id !== "esp").map((topic) => topic.id);
+
+  const pool = dedupeById(
+    topicIds.flatMap((topicId) => getTopicPracticeBundle(topicId).quizQuestions)
+  );
+
+  if (!options.paper) {
+    return pool;
+  }
+
+  return pool.filter((question) => question.paper === options.paper);
+}
+
+export function getPaperPracticeBundle(pathId: Exclude<PracticePathId, "mixed">) {
+  const paper: PracticePaper = pathId === "paper-1" ? "Paper 1" : "Paper 2";
+  const topicIds = TOPICS.filter((topic) => topic.id !== "esp").map((topic) => topic.id);
+  const bundles = topicIds.map((topicId) => getTopicPracticeBundle(topicId));
+  const quizQuestions = dedupeById(
+    bundles.flatMap((bundle) =>
+      bundle.quizQuestions.filter((question) => question.paper === paper)
+    )
+  );
+  const examDrills = dedupeById(
+    bundles.flatMap((bundle) =>
+      bundle.examDrills.filter((drill) => drill.paper === paper)
+    )
+  );
+  const relatedTopicIds = topicIds.filter((topicId) =>
+    quizQuestions.some((question) => question.topicId === topicId) ||
+    examDrills.some((drill) => drill.topicId === topicId)
+  );
+
+  return {
+    paper,
+    quizQuestions,
+    examDrills,
+    relatedTopicIds,
+  };
+}
+
+export function getPracticePathSummary(pathId: PracticePathId): PracticePathSummary {
+  if (pathId === "mixed") {
+    const relatedTopicIds = TOPICS.filter((topic) => topic.id !== "esp").map(
+      (topic) => topic.id
+    );
+    const questionCount = getFilteredQuickQuizQuestionPool().length;
+
     return {
-      isCorrect: false,
-      matchedCue: null,
-      confidence: 0,
+      id: "mixed",
+      title: "General practice",
+      eyebrow: "Start Here",
+      description:
+        "Cross-topic retrieval for waking everything up before you narrow down into a paper or one weak topic.",
+      questionCount,
+      examDrillCount: relatedTopicIds.reduce(
+        (sum, topicId) => sum + getTopicPracticeBundle(topicId).examDrills.length,
+        0
+      ),
+      topicCount: relatedTopicIds.length,
+      relatedTopicIds,
+      startLabel: "Start mixed quiz",
+      statLabel: "all-topic questions",
+      purpose: "Best when you want broad retrieval across the whole course.",
     };
   }
 
-  const cues = uniqueStrings([
-    question.correctAnswer,
-    ...(question.acceptableAnswers ?? []),
-  ]);
-
-  let bestCue: string | null = null;
-  let bestScore = 0;
-
-  for (const cue of cues) {
-    const normalizedCue = normalizeText(cue);
-
-    if (!normalizedCue.normalized) {
-      continue;
-    }
-
-    let score = 0;
-
-    if (
-      normalizedAnswer.normalized.includes(normalizedCue.normalized) ||
-      normalizedCue.normalized.includes(normalizedAnswer.normalized)
-    ) {
-      score = Math.max(score, 0.98);
-    }
-
-    const phraseEvidence = findPhraseEvidence(
-      normalizedAnswer,
-      normalizedCue.normalized
-    );
-    if (phraseEvidence) {
-      score = Math.max(score, phraseEvidence.similarity);
-    }
-
-    score = Math.max(
-      score,
-      stringSimilarity(normalizedAnswer.normalized, normalizedCue.normalized),
-      tokenOverlapScore(normalizedAnswer.tokens, normalizedCue.tokens)
-    );
-
-    if (score > bestScore) {
-      bestScore = score;
-      bestCue = cue;
-    }
-  }
+  const paperBundle = getPaperPracticeBundle(pathId);
+  const isPaperOne = pathId === "paper-1";
 
   return {
-    isCorrect: bestScore >= 0.72,
-    matchedCue: bestCue,
-    confidence: Math.min(1, Number(bestScore.toFixed(2))),
+    id: pathId,
+    title: isPaperOne ? "Paper 1 practice" : "Paper 2 practice",
+    eyebrow: "Practice by Paper",
+    description: isPaperOne
+      ? "Theory-heavy retrieval, terminology, shorter knowledge checks, and official-point drills."
+      : "Scenario-based written questions, applied design choices, and longer exam-style explanations.",
+    questionCount: paperBundle.quizQuestions.length,
+    examDrillCount: paperBundle.examDrills.length,
+    topicCount: paperBundle.relatedTopicIds.length,
+    relatedTopicIds: paperBundle.relatedTopicIds,
+    startLabel: isPaperOne ? "Start Paper 1 quiz" : "Start Paper 2 quiz",
+    statLabel: isPaperOne ? "paper 1 questions" : "paper 2 questions",
+    purpose: isPaperOne
+      ? "Use this when you want faster retrieval and theory coverage."
+      : "Use this when you want applied, exam-style written practice.",
+    paper: paperBundle.paper,
   };
 }
 

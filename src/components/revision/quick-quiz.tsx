@@ -15,15 +15,20 @@ import {
 import { useAppData } from "@/components/providers/app-data-provider";
 import { Badge, Button, ProgressBar } from "@/components/ui";
 import {
-  evaluatePracticeShortAnswer,
+  getFilteredQuickQuizQuestionPool,
   getPracticeSetId,
-  getQuickQuizQuestionPool,
 } from "@/lib/practice";
+import {
+  evaluatePracticeShortAnswer,
+  getAcceptedAnswerCues,
+} from "@/lib/practice-evaluator";
 import { cn } from "@/lib/utils";
 import { TOPICS } from "@/lib/types";
 
 interface QuickQuizProps {
   topicId?: string;
+  paperId?: "paper-1" | "paper-2";
+  autoStart?: boolean;
   onClose?: () => void;
 }
 
@@ -47,10 +52,17 @@ const typeIcon = {
   "short-answer": MessageSquare,
 };
 
-export function QuickQuiz({ topicId, onClose }: QuickQuizProps) {
+export function QuickQuiz({
+  topicId,
+  paperId,
+  autoStart = false,
+  onClose,
+}: QuickQuizProps) {
   const { trackPracticeSetProgress } = useAppData();
+  const lockedPaper =
+    paperId === "paper-1" ? "Paper 1" : paperId === "paper-2" ? "Paper 2" : undefined;
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(topicId ?? null);
-  const [quizStarted, setQuizStarted] = useState(false);
+  const [quizStarted, setQuizStarted] = useState(autoStart);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [typedAnswer, setTypedAnswer] = useState("");
@@ -62,17 +74,23 @@ export function QuickQuiz({ topicId, onClose }: QuickQuizProps) {
   const [isSavingProgress, setIsSavingProgress] = useState(false);
 
   const questions = useMemo(() => {
-    const pool = getQuickQuizQuestionPool(selectedTopicId ?? undefined);
+    const pool = getFilteredQuickQuizQuestionPool({
+      topicId: selectedTopicId ?? undefined,
+      paper: lockedPaper,
+    });
     return shuffleArray(pool).slice(0, Math.min(pool.length, 8));
-  }, [selectedTopicId]);
+  }, [lockedPaper, selectedTopicId]);
 
   const availableTopics = useMemo(
     () =>
       TOPICS.filter((topic) => topic.id !== "esp").map((topic) => ({
         ...topic,
-        count: getQuickQuizQuestionPool(topic.id).length,
+        count: getFilteredQuickQuizQuestionPool({
+          topicId: topic.id,
+          paper: lockedPaper,
+        }).length,
       })),
-    []
+    [lockedPaper]
   );
 
   const currentQuestion = questions[currentIndex];
@@ -161,7 +179,7 @@ export function QuickQuiz({ topicId, onClose }: QuickQuizProps) {
     setScore(0);
     setAnsweredCount(0);
     setQuizFinished(false);
-    setQuizStarted(false);
+    setQuizStarted(autoStart);
     setSaveError("");
     setSelectedTopicId(topicId ?? null);
   }
@@ -190,7 +208,12 @@ export function QuickQuiz({ topicId, onClose }: QuickQuizProps) {
 
   if (!quizStarted) {
     const lockedTopic = topicId ? TOPICS.find((topic) => topic.id === topicId) : null;
-    const lockedTopicCount = topicId ? getQuickQuizQuestionPool(topicId).length : 0;
+    const lockedTopicCount = topicId
+      ? getFilteredQuickQuizQuestionPool({ topicId, paper: lockedPaper }).length
+      : 0;
+    const lockedPaperCount = lockedPaper
+      ? getFilteredQuickQuizQuestionPool({ paper: lockedPaper }).length
+      : 0;
 
     return (
       <div className="space-y-6">
@@ -203,7 +226,7 @@ export function QuickQuiz({ topicId, onClose }: QuickQuizProps) {
             Test yourself with fast retrieval questions
           </h2>
           <p className="mx-auto mt-2 max-w-2xl text-sm text-muted">
-            Questions are now built from glossary terms, mapped subtopics, and PDF-derived exam prompts instead of a fixed shell bank.
+            Questions are built from glossary terms, mapped subtopics, official point drills, and PDF-derived exam prompts.
           </p>
         </div>
 
@@ -225,11 +248,38 @@ export function QuickQuiz({ topicId, onClose }: QuickQuizProps) {
                   </div>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  {lockedTopicCount} retrieval questions built from this topic’s terms, subtopics, and exam question metadata.
+                  {lockedTopicCount} retrieval questions built from this topic&apos;s terms, subtopics, and exam question metadata.
                 </p>
               </div>
               <Button size="lg" onClick={() => startQuiz(topicId)}>
                 Start topic quiz
+                <ArrowRight size={14} />
+              </Button>
+            </div>
+          </div>
+        ) : lockedPaper ? (
+          <div className="rounded-[28px] border border-accent/20 bg-[linear-gradient(145deg,rgba(139,92,246,0.16),rgba(17,17,19,0.95)_42%,rgba(17,17,19,1))] p-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
+                    <Zap size={18} className="text-accent" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      Paper route
+                    </p>
+                    <h3 className="text-xl font-semibold text-foreground">
+                      {lockedPaper}
+                    </h3>
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {lockedPaperCount} questions filtered to {lockedPaper.toLowerCase()} structure and wording.
+                </p>
+              </div>
+              <Button size="lg" onClick={() => startQuiz()}>
+                Start {lockedPaper} quiz
                 <ArrowRight size={14} />
               </Button>
             </div>
@@ -248,7 +298,7 @@ export function QuickQuiz({ topicId, onClose }: QuickQuizProps) {
                   <div>
                     <p className="text-sm font-semibold text-foreground">All Topics Mix</p>
                     <p className="text-xs text-muted-foreground">
-                      {getQuickQuizQuestionPool().length} questions across all topics
+                      {getFilteredQuickQuizQuestionPool().length} questions across all topics
                     </p>
                   </div>
                 </div>
@@ -322,7 +372,9 @@ export function QuickQuiz({ topicId, onClose }: QuickQuizProps) {
         <div>
           <h2 className="text-2xl font-bold text-foreground">Quiz complete</h2>
           <p className="mt-1 text-sm text-muted">
-            {topicInfo ? `${topicInfo.icon} ${topicInfo.label}` : "All Topics Mix"}
+            {topicInfo
+              ? `${topicInfo.icon} ${topicInfo.label}`
+              : lockedPaper ?? "All Topics Mix"}
           </p>
         </div>
 
@@ -367,7 +419,7 @@ export function QuickQuiz({ topicId, onClose }: QuickQuizProps) {
           </Button>
           {onClose && (
             <Button variant="ghost" onClick={onClose}>
-              Back to Workspace
+              Back
             </Button>
           )}
         </div>
@@ -379,7 +431,7 @@ export function QuickQuiz({ topicId, onClose }: QuickQuizProps) {
     return (
       <div className="rounded-2xl border border-border bg-surface/30 px-5 py-6 text-center">
         <p className="text-sm text-muted-foreground">
-          No quiz questions are mapped for this topic yet.
+          No quiz questions are mapped for this route yet.
         </p>
       </div>
     );
@@ -387,6 +439,11 @@ export function QuickQuiz({ topicId, onClose }: QuickQuizProps) {
 
   const TypeIcon = typeIcon[currentQuestion.type];
   const topicInfo = TOPICS.find((topic) => topic.id === currentQuestion.topicId);
+
+  const acceptedAnswerCues =
+    currentQuestion.type === "short-answer"
+      ? getAcceptedAnswerCues(currentQuestion)
+      : [];
 
   return (
     <div className="space-y-5">
@@ -431,6 +488,9 @@ export function QuickQuiz({ topicId, onClose }: QuickQuizProps) {
                 <Badge variant="default" className="ml-auto">
                   {currentQuestion.sourceLabel}
                 </Badge>
+              )}
+              {currentQuestion.paper && (
+                <Badge variant="accent">{currentQuestion.paper}</Badge>
               )}
               <span
                 className={cn(
@@ -551,8 +611,8 @@ export function QuickQuiz({ topicId, onClose }: QuickQuizProps) {
                       Accepted answer cues
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
-                      {[currentQuestion.correctAnswer, ...(currentQuestion.acceptableAnswers ?? [])]
-                        .slice(0, 5)
+                      {acceptedAnswerCues
+                        .slice(0, 6)
                         .map((cue) => (
                           <span
                             key={`${currentQuestion.id}-${cue}`}
@@ -591,17 +651,71 @@ export function QuickQuiz({ topicId, onClose }: QuickQuizProps) {
                     isCorrect ? "text-success" : "text-danger"
                   )}
                 >
-                  {isCorrect ? "Correct" : "Not quite"}
+                  {currentQuestion.type === "short-answer" && currentCheck
+                    ? currentCheck.verdictLabel
+                    : isCorrect
+                      ? "Correct"
+                      : "Not quite"}
                 </span>
                 {currentQuestion.type === "short-answer" && currentCheck && (
                   <span className="text-xs text-muted-foreground">
-                    Match confidence {Math.round(currentCheck.confidence * 100)}%
+                    Rubric confidence {Math.round(currentCheck.confidence * 100)}%
                   </span>
                 )}
               </div>
               <p className="text-sm leading-relaxed text-muted">
-                {currentQuestion.explanation}
+                {currentQuestion.type === "short-answer" && currentCheck
+                  ? currentCheck.feedback
+                  : currentQuestion.explanation}
               </p>
+              {currentQuestion.type === "short-answer" && currentCheck && (
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Matched ideas
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {currentCheck.matchedSlots.length > 0 ? (
+                        currentCheck.matchedSlots.map((slot) => (
+                          <span
+                            key={`${currentQuestion.id}-matched-${slot}`}
+                            className="rounded-lg bg-success/10 px-2.5 py-1 text-[11px] text-success"
+                          >
+                            {slot}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-xs text-muted-foreground">
+                          No rubric slots were clearly covered.
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Still missing
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {[...currentCheck.partialSlots, ...currentCheck.missingSlots].length > 0 ? (
+                        [...currentCheck.partialSlots, ...currentCheck.missingSlots]
+                          .slice(0, 3)
+                          .map((slot) => (
+                            <span
+                              key={`${currentQuestion.id}-missing-${slot}`}
+                              className="rounded-lg bg-warning/10 px-2.5 py-1 text-[11px] text-warning"
+                            >
+                              {slot}
+                            </span>
+                          ))
+                      ) : (
+                        <span className="text-xs text-muted-foreground">
+                          No major gaps were detected.
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </motion.div>
           )}
 

@@ -2,6 +2,22 @@ import type { MarkSchemeConceptMetadata } from "./types";
 
 export const MARK_SCHEME_CONCEPTS: MarkSchemeConceptMetadata[] = [
   {
+    id: "ms-paper2-2023-q2b-healthcare-cia",
+    sourceId: "mark-scheme-summer-2022",
+    title: "Healthcare confidentiality and integrity controls",
+    summary:
+      "Credit answers that explain what confidentiality and integrity mean in patient-record systems, who should have authorised access, how accuracy is maintained, and why poor control could harm care or privacy.",
+    conceptTargets: [
+      "confidentiality protects sensitive patient data from unauthorised access",
+      "only authorised staff should access the parts of the record they need",
+      "integrity means records stay accurate, complete, and protected from improper change",
+      "validation, audit trails, and controlled editing help maintain integrity",
+      "poor record control can cause privacy breaches, unsafe treatment, or loss of trust",
+    ],
+    curriculumPointIds: ["dsd-1.4", "dsd-2.2", "dsd-6.1"],
+    legacyTopicIds: ["security", "legislation"],
+  },
+  {
     id: "ms-aut22-q2b-remote-working-threats",
     sourceId: "mark-scheme-autumn-2022",
     title: "Remote working security threats",

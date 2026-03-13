@@ -37,7 +37,175 @@ export const QUESTION_METADATA: QuestionMetadata[] = [
     legacyTopicIds: ["security", "legislation"],
     practicePrompt:
       "Explain how confidentiality and integrity should shape the design of a healthcare records system.",
-    markSchemeConceptIds: ["ms-general-linked-explanation"],
+    markSchemeConceptIds: [
+      "ms-paper2-2023-q2b-healthcare-cia",
+      "ms-general-linked-explanation",
+    ],
+    evaluationProfile: {
+      depthExpectation: "developed",
+      strongAnswerGuidance:
+        "A strong answer explains what must be protected, who should access it, how unauthorised access is controlled, how record accuracy and change control are maintained, and why this matters in a healthcare setting.",
+      slots: [
+        {
+          id: "confidentiality-core",
+          label: "Confidentiality protects sensitive patient information",
+          weight: 2,
+          minimumGroups: 2,
+          groups: [
+            { anyOf: ["confidentiality", "confidential", "privacy"] },
+            {
+              anyOf: [
+                "patient data",
+                "patient record",
+                "medical record",
+                "sensitive personal information",
+                "healthcare record",
+              ],
+            },
+            {
+              anyOf: [
+                "unauthorised access",
+                "unauthorised viewing",
+                "only the right people",
+                "only authorised staff",
+                "restricted access",
+                "people who need it",
+              ],
+            },
+          ],
+          missingFeedback:
+            "State clearly that confidentiality means protecting sensitive patient data from unauthorised access.",
+        },
+        {
+          id: "integrity-core",
+          label: "Integrity keeps records accurate and prevents improper change",
+          weight: 2,
+          minimumGroups: 2,
+          groups: [
+            { anyOf: ["integrity", "accurate records", "data stays accurate"] },
+            {
+              anyOf: [
+                "accurate",
+                "correct",
+                "complete",
+                "reliable",
+                "up to date",
+              ],
+            },
+            {
+              anyOf: [
+                "not changed improperly",
+                "not tampered with",
+                "prevent improper change",
+                "prevent unauthorised change",
+                "changed incorrectly",
+              ],
+            },
+          ],
+          missingFeedback:
+            "Explain that integrity means keeping records correct and preventing incorrect or unauthorised changes.",
+        },
+        {
+          id: "access-control-measures",
+          label: "Authorised access is controlled through design measures",
+          weight: 2,
+          minimumGroups: 2,
+          groups: [
+            {
+              anyOf: [
+                "role based access",
+                "role-based access",
+                "access control",
+                "permissions",
+                "user accounts",
+                "login",
+              ],
+            },
+            {
+              anyOf: [
+                "strong password",
+                "password policy",
+                "authentication",
+                "encryption",
+                "two factor",
+                "2fa",
+              ],
+            },
+            {
+              anyOf: [
+                "doctor",
+                "nurse",
+                "administrator",
+                "authorised staff",
+                "relevant staff",
+                "staff who need it",
+              ],
+            },
+          ],
+          missingFeedback:
+            "Add who should have access and at least one concrete control such as role-based access, authentication, or encryption.",
+        },
+        {
+          id: "change-control-measures",
+          label: "Validation and traceability help maintain integrity",
+          weight: 2,
+          minimumGroups: 1,
+          groups: [
+            {
+              anyOf: [
+                "validation",
+                "validation check",
+                "input validation",
+                "controlled editing",
+              ],
+            },
+            {
+              anyOf: [
+                "audit trail",
+                "audit log",
+                "track who changed what",
+                "who changed what and when",
+                "change history",
+              ],
+            },
+            {
+              anyOf: ["backup", "backups", "restore", "recovery copy"],
+            },
+          ],
+          missingFeedback:
+            "Explain how the system keeps records trustworthy, for example with validation, audit trails, or backups.",
+        },
+        {
+          id: "healthcare-consequence",
+          label: "Healthcare consequences are explained",
+          weight: 1,
+          minimumGroups: 1,
+          groups: [
+            {
+              anyOf: [
+                "unsafe treatment",
+                "wrong dosage",
+                "allergy",
+                "diagnosis changed",
+                "patient harm",
+              ],
+            },
+            {
+              anyOf: [
+                "privacy breach",
+                "break the law",
+                "legal issue",
+                "trust in the record",
+                "patient trust",
+                "safeguard privacy",
+              ],
+            },
+          ],
+          missingFeedback:
+            "Link the controls to a healthcare outcome, such as privacy harm, unsafe treatment, or accountability.",
+        },
+      ],
+    },
   },
   {
     id: "paper2-2023-q3-quality-service",
@@ -234,6 +402,7 @@ export const QUESTION_METADATA: QuestionMetadata[] = [
     sourceId: "paper1-q-and-a",
     title: "Question bank: decomposition, pattern recognition, and abstraction",
     sourceLabel: "Paper 1 Q&A",
+    paper: "Paper 1",
     questionType: "question-bank-section",
     summary:
       "Legacy practice bank section covering decomposition, pattern recognition, and abstraction from the older core structure.",
@@ -250,6 +419,7 @@ export const QUESTION_METADATA: QuestionMetadata[] = [
     sourceId: "paper1-q-and-a",
     title: "Question bank: data validation and data types",
     sourceLabel: "Paper 1 Q&A",
+    paper: "Paper 1",
     questionType: "question-bank-section",
     summary:
       "Legacy question-bank coverage for validation, data types, and related programming basics.",
