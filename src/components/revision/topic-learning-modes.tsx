@@ -7,6 +7,7 @@ import {
   Target,
 } from "lucide-react";
 import { Badge, Card } from "@/components/ui";
+import { extractCommandWord } from "@/lib/command-words";
 import type {
   PracticeExamDrill,
   PracticeRecallCard,
@@ -339,9 +340,9 @@ export function RecallPanel({
         {error ? (
           <ErrorMessage message={error} />
         ) : (
-          <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4 text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Use the mastery signal to decide whether you should practise a written answer next or repeat the cards that still felt weak.
-          </div>
+          </p>
         )}
       </LearningOutcomePanel>
     );
@@ -387,7 +388,7 @@ export function RecallPanel({
               {currentCard.tags.slice(0, 4).map((tag) => (
                 <span
                   key={`${currentCard.id}-${tag}`}
-                  className="rounded-full border border-white/8 bg-black/20 px-3 py-1 text-xs text-muted-foreground"
+                  className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground"
                 >
                   {tag}
                 </span>
@@ -416,17 +417,17 @@ export function RecallPanel({
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              <div className="border-t border-border pt-4">
+                <p className="text-xs font-medium text-muted-foreground">
                   Next when you review
                 </p>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                   {currentCard.nextStep}
                 </p>
               </div>
             </div>
           ) : (
-            <div className="space-y-3 rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
+            <div className="space-y-3">
               <p className="text-sm leading-relaxed text-foreground/90">
                 Stop and retrieve the answer from memory before you reveal it. The goal is to test recall, not recognition.
               </p>
@@ -638,9 +639,9 @@ export function ExamDrillPanel({
         {error ? (
           <ErrorMessage message={error} />
         ) : (
-          <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4 text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Use the readiness signal to decide whether to move into rubric-based answer checking or spend another round planning exam responses.
-          </div>
+          </p>
         )}
       </LearningOutcomePanel>
     );
@@ -675,21 +676,37 @@ export function ExamDrillPanel({
         />
       }
       task={
-        <TaskPanel title={currentDrill.title} subtitle={currentDrill.prompt} />
+        (() => {
+          const cw = extractCommandWord(currentDrill.prompt);
+          return (
+            <TaskPanel title={currentDrill.title} subtitle={currentDrill.prompt} commandWord={cw} />
+          );
+        })()
       }
       response={
-        <TaskResponsePanel
-          label="Plan your answer"
-          description="Outline the structure you would use, the key ideas to include, and one example or consequence you would mention before you compare it with the checklist."
-        >
-          <textarea
-            value={notes}
-            onChange={(event) => setNotes(event.target.value)}
-            rows={6}
-            placeholder="Plan your answer here..."
-            className="w-full rounded-2xl border border-border bg-card/60 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/30"
-          />
-        </TaskResponsePanel>
+        (() => {
+          const cw = extractCommandWord(currentDrill.prompt);
+          const placeholder = cw
+            ? `Plan your ${cw.word.toLowerCase()} response here...`
+            : "Plan your answer here...";
+          return (
+            <TaskResponsePanel
+              label="Plan your answer"
+              description="Outline the structure you would use, the key ideas to include, and one example or consequence you would mention before you compare it with the checklist."
+            >
+              {cw ? (
+                <p className="text-xs text-muted-foreground">{cw.guidance}</p>
+              ) : null}
+              <textarea
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                rows={6}
+                placeholder={placeholder}
+                className="w-full rounded-2xl border border-border bg-card/60 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/30"
+              />
+            </TaskResponsePanel>
+          );
+        })()
       }
       feedback={
         showChecklist ? (
@@ -712,7 +729,7 @@ export function ExamDrillPanel({
                 {currentDrill.checklist.map((item) => (
                   <div
                     key={`${currentDrill.id}-${item}`}
-                    className="rounded-xl border border-white/8 bg-black/20 px-3 py-3 text-sm text-foreground/90"
+                    className="rounded-xl border border-border px-3 py-3 text-sm text-foreground/90"
                   >
                     {toSentenceCase(item)}
                   </div>

@@ -26,6 +26,7 @@ import {
   evaluatePracticeShortAnswer,
   getAcceptedAnswerCues,
 } from "@/lib/practice-evaluator";
+import { extractCommandWord } from "@/lib/command-words";
 import { cn } from "@/lib/utils";
 import { TOPICS } from "@/lib/types";
 
@@ -730,25 +731,33 @@ export function QuickQuiz({
         </TaskContextStrip>
       }
       task={
-        <TaskPanel
-          title={currentQuestion.question}
-          subtitle={
-            currentQuestion.type === "multiple-choice"
-              ? "Choose the option that best fits the prompt."
-              : "Write your answer in your own words, then compare it with the rubric feedback."
-          }
-        >
-          <motion.div
-            key={currentQuestion.id}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.22 }}
-            className="flex flex-wrap items-center gap-2 border-t border-white/8 pt-4"
-          >
-            {currentQuestion.sourceLabel ? <Badge variant="default">{currentQuestion.sourceLabel}</Badge> : null}
-            <Badge variant="default">{currentQuestion.type === "multiple-choice" ? "Fast check" : "Short answer"}</Badge>
-          </motion.div>
-        </TaskPanel>
+        (() => {
+          const cw = currentQuestion.type === "short-answer"
+            ? extractCommandWord(currentQuestion.question)
+            : null;
+          return (
+            <TaskPanel
+              title={currentQuestion.question}
+              subtitle={
+                currentQuestion.type === "multiple-choice"
+                  ? "Choose the option that best fits the prompt."
+                  : "Write your answer in your own words, then compare it with the rubric feedback."
+              }
+              commandWord={cw}
+            >
+              <motion.div
+                key={currentQuestion.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.22 }}
+                className="flex flex-wrap items-center gap-2 border-t border-border pt-4"
+              >
+                {currentQuestion.sourceLabel ? <Badge variant="default">{currentQuestion.sourceLabel}</Badge> : null}
+                <Badge variant="default">{currentQuestion.type === "multiple-choice" ? "Fast check" : "Short answer"}</Badge>
+              </motion.div>
+            </TaskPanel>
+          );
+        })()
       }
       response={
         <TaskResponsePanel
@@ -876,7 +885,7 @@ export function QuickQuiz({
           >
             {currentQuestion.type === "short-answer" && currentCheck ? (
               <div className="grid gap-3 lg:grid-cols-3">
-                <div className="space-y-2 rounded-2xl border border-white/8 bg-black/15 p-4">
+                <div className="space-y-2 rounded-2xl border border-border p-4">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                     Accepted cues
                   </p>
@@ -946,7 +955,7 @@ export function QuickQuiz({
                 </div>
               </div>
             ) : currentQuestion.type === "multiple-choice" && !isCorrect ? (
-              <div className="rounded-2xl border border-white/8 bg-black/15 p-4">
+              <div className="rounded-2xl border border-border p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                   Correct answer
                 </p>

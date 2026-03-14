@@ -15,6 +15,7 @@ import { TaskFeedbackPanel } from "@/components/revision/active-learning/task-fe
 import { TaskPanel } from "@/components/revision/active-learning/task-panel";
 import { TaskResponsePanel } from "@/components/revision/active-learning/task-response-panel";
 import { Badge, ProgressBar } from "@/components/ui";
+import { extractCommandWord } from "@/lib/command-words";
 import { getPracticeQuestionForTopic } from "@/lib/intelligence/catalog";
 import type { RevisionAnswerEvaluation } from "@/lib/intelligence/types";
 
@@ -208,31 +209,48 @@ export function WrittenAnswerChecker({
         </TaskContextStrip>
       }
       task={
-        <TaskPanel
-          title={question.prompt}
-          subtitle="Write a short structured answer. The checker looks for the key ideas, how clearly you explain them, and how well you link them to the scenario."
-        />
+        (() => {
+          const cw = extractCommandWord(question.prompt);
+          return (
+            <TaskPanel
+              title={question.prompt}
+              subtitle="Write a short structured answer. The checker looks for the key ideas, how clearly you explain them, and how well you link them to the scenario."
+              commandWord={cw}
+            />
+          );
+        })()
       }
       response={
-        <TaskResponsePanel
-          label="Your response"
-          description="Type your answer first, then run the checker to see score, matched ideas, missing concepts, and misconceptions."
-        >
-          <div className="space-y-3">
-            <textarea
-              id={`written-answer-${question.id}`}
-              value={answer}
-              onChange={(event) => {
-                setAnswer(event.target.value);
-                setError("");
-                if (result) {
-                  setIsDirtySinceLastCheck(true);
-                }
-              }}
-              rows={8}
-              placeholder="Write a short structured answer. Mention the concept, explain it, and link it to the scenario."
-              className="min-h-[220px] w-full rounded-3xl border border-border bg-surface/40 px-4 py-4 text-sm text-foreground placeholder:text-muted-foreground/60 transition-colors focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/30"
-            />
+        (() => {
+          const cw = extractCommandWord(question.prompt);
+          const placeholder = cw
+            ? `Write your ${cw.word.toLowerCase()} response here. Mention the concept, ${cw.guidance.charAt(0).toLowerCase()}${cw.guidance.slice(1)}`
+            : "Write a short structured answer. Mention the concept, explain it, and link it to the scenario.";
+          return (
+            <TaskResponsePanel
+              label="Your response"
+              description="Type your answer first, then run the checker to see score, matched ideas, missing concepts, and misconceptions."
+            >
+              <div className="space-y-3">
+                {cw ? (
+                  <p className="text-xs text-muted-foreground">
+                    This question asks you to <span className="font-medium text-accent">{cw.word.toLowerCase()}</span> — {cw.guidance.charAt(0).toLowerCase()}{cw.guidance.slice(1)}
+                  </p>
+                ) : null}
+                <textarea
+                  id={`written-answer-${question.id}`}
+                  value={answer}
+                  onChange={(event) => {
+                    setAnswer(event.target.value);
+                    setError("");
+                    if (result) {
+                      setIsDirtySinceLastCheck(true);
+                    }
+                  }}
+                  rows={8}
+                  placeholder={placeholder}
+                  className="min-h-[220px] w-full rounded-3xl border border-border bg-surface/40 px-4 py-4 text-sm text-foreground placeholder:text-muted-foreground/60 transition-colors focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/30"
+                />
 
             <div className="flex flex-col gap-2 text-xs">
               {error ? (
@@ -255,6 +273,8 @@ export function WrittenAnswerChecker({
             </div>
           </div>
         </TaskResponsePanel>
+          );
+        })()
       }
       feedback={
         result ? (
@@ -268,7 +288,7 @@ export function WrittenAnswerChecker({
             }
           >
             <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_260px]">
-              <div className="space-y-3 rounded-3xl border border-white/8 bg-black/15 p-4">
+              <div className="space-y-3 rounded-3xl border border-border p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                   Score summary
                 </p>
@@ -284,7 +304,7 @@ export function WrittenAnswerChecker({
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-                <div className="rounded-3xl border border-white/8 bg-black/15 p-4">
+                <div className="rounded-3xl border border-border p-4">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                     Confidence
                   </p>
@@ -305,7 +325,7 @@ export function WrittenAnswerChecker({
                   />
                 </div>
 
-                <div className="rounded-3xl border border-white/8 bg-black/15 p-4">
+                <div className="rounded-3xl border border-border p-4">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                     Coverage
                   </p>
@@ -364,7 +384,7 @@ export function WrittenAnswerChecker({
                 className={
                   result.misconceptions.length > 0
                     ? "rounded-3xl border border-danger/20 bg-danger/5 p-4"
-                    : "rounded-3xl border border-white/8 bg-black/15 p-4"
+                    : "rounded-3xl border border-border p-4"
                 }
               >
                 <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
@@ -381,7 +401,7 @@ export function WrittenAnswerChecker({
                     result.misconceptionBreakdown.map((item) => (
                       <div
                         key={item.id}
-                        className="rounded-2xl border border-white/8 bg-black/15 p-3"
+                        className="rounded-2xl border border-border p-3"
                       >
                         <p className="text-sm font-medium text-foreground">{item.label}</p>
                         <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
@@ -398,7 +418,7 @@ export function WrittenAnswerChecker({
               </section>
             </div>
 
-            <section className="rounded-3xl border border-white/8 bg-black/15 p-4">
+            <section className="rounded-3xl border border-border p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
@@ -423,7 +443,7 @@ export function WrittenAnswerChecker({
                   return (
                     <div
                       key={concept.id}
-                      className="rounded-3xl border border-white/8 bg-black/15 p-4"
+                      className="rounded-3xl border border-border p-4"
                     >
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                         <div className="space-y-3">
@@ -445,7 +465,7 @@ export function WrittenAnswerChecker({
                                 {concept.matchedEvidence.map((evidence) => (
                                   <span
                                     key={`${concept.id}-${evidence}`}
-                                    className="rounded-lg border border-white/8 bg-black/20 px-2.5 py-1 text-[11px] text-foreground/90"
+                                    className="rounded-lg border border-border px-2.5 py-1 text-[11px] text-foreground/90"
                                   >
                                     {evidence}
                                   </span>
@@ -463,7 +483,7 @@ export function WrittenAnswerChecker({
                                 {concept.missingEvidence.slice(0, 3).map((evidence) => (
                                   <span
                                     key={`${concept.id}-missing-${evidence}`}
-                                    className="rounded-lg border border-white/8 bg-black/20 px-2.5 py-1 text-[11px] text-muted-foreground"
+                                    className="rounded-lg border border-border px-2.5 py-1 text-[11px] text-muted-foreground"
                                   >
                                     {evidence}
                                   </span>

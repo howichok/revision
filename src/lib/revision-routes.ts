@@ -23,108 +23,25 @@ export const REVISION_ROUTE_ITEMS: Array<{
   id: RevisionRouteId;
   label: string;
   href: string;
-  description: string;
+  description?: string;
 }> = [
-  {
-    id: "hub",
-    label: "Revision Hub",
-    href: "/revision",
-    description: "Choose a revision path.",
-  },
-  {
-    id: "diagnostic",
-    label: "Diagnostic",
-    href: "/revision/diagnostic",
-    description: "Map your weak points first.",
-  },
-  {
-    id: "topics",
-    label: "Topics",
-    href: "/revision/topics",
-    description: "Open a topic workspace.",
-  },
-  {
-    id: "quick-quiz",
-    label: "Quick Quiz",
-    href: "/revision/quick-quiz",
-    description: "Fast retrieval across topics.",
-  },
-  {
-    id: "paper-1",
-    label: "Paper 1",
-    href: "/revision/paper-1",
-    description: "Theory-heavy exam practice.",
-  },
-  {
-    id: "paper-2",
-    label: "Paper 2",
-    href: "/revision/paper-2",
-    description: "Applied written practice.",
-  },
-  {
-    id: "weak-areas",
-    label: "Weak Areas",
-    href: "/revision/weak-areas",
-    description: "Review what still needs work.",
-  },
-  {
-    id: "progress",
-    label: "Progress",
-    href: "/revision/progress",
-    description: "See your saved revision state.",
-  },
+  { id: "topics", label: "Topics", href: "/revision/topics" },
+  { id: "quick-quiz", label: "Quiz", href: "/revision/quick-quiz" },
+  { id: "paper-1", label: "Paper 1", href: "/revision/paper-1" },
+  { id: "paper-2", label: "Paper 2", href: "/revision/paper-2" },
+  { id: "diagnostic", label: "Diagnostic", href: "/revision/diagnostic" },
+  { id: "progress", label: "Progress", href: "/revision/progress" },
 ];
 
 export const TOPIC_ROUTE_ITEMS: Array<{
   id: TopicLearningMode;
   label: string;
-  description: string;
+  description?: string;
 }> = [
-  {
-    id: "overview",
-    label: "Overview",
-    description: "Topic summary, curriculum points, and linked content.",
-  },
-  {
-    id: "practice",
-    label: "Practice Hub",
-    description: "Choose recall, drills, checking, or quiz.",
-  },
-  {
-    id: "recall",
-    label: "Active Recall",
-    description: "Recall cards and mastery signal.",
-  },
-  {
-    id: "exam-drill",
-    label: "Exam Drill",
-    description: "Plan and self-check exam responses.",
-  },
-  {
-    id: "answer-check",
-    label: "Answer Check",
-    description: "Check a written answer against the rubric.",
-  },
-  {
-    id: "quiz",
-    label: "Quick Quiz",
-    description: "Short retrieval questions for this topic.",
-  },
-  {
-    id: "exam-questions",
-    label: "Exam Questions",
-    description: "Mapped paper prompts and answer focus.",
-  },
-  {
-    id: "resources",
-    label: "Resources",
-    description: "Topic-specific notes, papers, and schemes.",
-  },
-  {
-    id: "progress",
-    label: "Progress",
-    description: "Saved topic progress and practice state.",
-  },
+  { id: "overview", label: "Overview" },
+  { id: "practice", label: "Practice" },
+  { id: "exam-questions", label: "Exam Questions" },
+  { id: "resources", label: "Resources" },
 ];
 
 export function getTopicRouteHref(topicId: string, mode: TopicLearningMode) {

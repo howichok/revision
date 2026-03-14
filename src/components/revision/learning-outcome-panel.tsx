@@ -110,12 +110,12 @@ export function LearningOutcomePanel({
       </div>
 
       {typeof progressValue === "number" && progressLabel && (
-        <div className="mt-4 rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
+        <div className="mt-4">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>{progressLabel}</span>
             <span>{progressValue}%</span>
           </div>
-          <ProgressBar value={progressValue} size="sm" className="mt-3" />
+          <ProgressBar value={progressValue} size="sm" className="mt-2" />
         </div>
       )}
 

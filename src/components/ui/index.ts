@@ -11,3 +11,4 @@ export { MaterialCard } from "./material-card";
 export type { MaterialCardData } from "./material-card";
 export { ResourceCard } from "./resource-card";
 export { SearchComposer } from "./search-composer";
+export { CommandWordChip } from "./command-word-chip";
