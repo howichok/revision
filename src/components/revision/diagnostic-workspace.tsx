@@ -1,15 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   AlertCircle,
   ArrowRight,
-  BrainCircuit,
-  ClipboardCheck,
-  Sparkles,
-  Target,
 } from "lucide-react";
 import { ActiveLearningLayout } from "@/components/revision/active-learning/active-learning-layout";
 import { LearningRail } from "@/components/revision/active-learning/learning-rail";
@@ -20,7 +15,7 @@ import { TaskFeedbackPanel } from "@/components/revision/active-learning/task-fe
 import { TaskPanel } from "@/components/revision/active-learning/task-panel";
 import { TaskResponsePanel } from "@/components/revision/active-learning/task-response-panel";
 import { LearningOutcomePanel } from "@/components/revision/learning-outcome-panel";
-import { Badge, Button, Card, ProgressBar } from "@/components/ui";
+import { Badge, Button } from "@/components/ui";
 import {
   analyzeTopicDiagnosticSession,
   getDiagnosticTopics,
@@ -28,7 +23,6 @@ import {
   mergeDiagnosticResult,
   type DiagnosticFollowUpQuestion,
 } from "@/lib/diagnostic";
-import { getRecommendedMaterialCards } from "@/lib/content";
 import { getBrowserSupabaseClient } from "@/lib/supabase/client";
 import { getSupabaseConfig } from "@/lib/supabase/config";
 import { cn } from "@/lib/utils";
@@ -119,102 +113,20 @@ function DiagnosticTopicSelectionState({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-2xl space-y-8 py-6">
       {error ? <DiagnosticError error={error} /> : null}
 
-      <div className="mx-auto max-w-3xl text-center">
-        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-accent">
-          <BrainCircuit size={12} />
-          Diagnostic mode
-        </div>
-        <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-          Start with one topic and prove what you already know.
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+          Choose a topic to diagnose
         </h1>
-        <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          This flow checks curriculum coverage from a freeform explanation, then asks targeted follow-ups only where the evidence is still weak.
+        <p className="mt-1 text-sm text-muted-foreground">
+          You&apos;ll explain what you know, then answer targeted follow-ups.
         </p>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="rounded-[30px] border border-accent/20 bg-[linear-gradient(145deg,rgba(139,92,246,0.18),rgba(17,17,19,0.95)_42%,rgba(17,17,19,1))] p-6 shadow-[0_0_40px_-22px_rgba(139,92,246,0.7)]"
-        >
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-2xl">
-                  {previewTopic.icon}
-                </span>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                    Selected topic
-                  </p>
-                  <h2 className="text-2xl font-semibold text-foreground">{previewTopic.label}</h2>
-                </div>
-              </div>
-              <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-                {previewDefinition.description}
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-2 sm:max-w-[220px] sm:justify-end">
-              <Badge variant="accent">{previewDefinition.points.length} points assessed</Badge>
-              <Badge variant="default">Freeform first</Badge>
-              <Badge variant="warning">Targeted follow-ups</Badge>
-            </div>
-          </div>
-
-          <div className="mt-6 grid gap-3 sm:grid-cols-3">
-            {previewDefinition.points.slice(0, 3).map((point) => (
-              <div key={point.id} className="rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  {point.id}
-                </p>
-                <p className="mt-1 text-sm font-medium text-foreground">{point.label}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs text-muted-foreground">
-              You will write one baseline explanation, then answer only the follow-up checks needed for this topic.
-            </p>
-            <Button size="lg" onClick={() => startTopic(previewTopic.id)}>
-              Start diagnostic for this topic
-              <ArrowRight size={16} />
-            </Button>
-          </div>
-        </motion.div>
-
-        <Card variant="support" className="p-5">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            How this flow works
-          </p>
-          <div className="mt-4 space-y-3">
-            {[
-              "Choose one topic instead of landing in a mixed workspace.",
-              "Write what you already know in your own words.",
-              "Answer only the follow-up checks needed to confirm weak points.",
-              "Finish with a saved results summary and direct next-step practice.",
-            ].map((item) => (
-              <div key={item} className="surface-cutout rounded-xl px-3 py-3 text-sm text-foreground">
-                {item}
-              </div>
-            ))}
-          </div>
-          <div className="mt-5">
-            <Link href="/revision">
-              <Button variant="ghost">Back to revision hub</Button>
-            </Link>
-          </div>
-        </Card>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="space-y-2">
         {topics.map((topic) => {
-          const definition = getTopicDiagnosticDefinition(topic.id);
           const isPreview = previewTopicId === topic.id;
 
           return (
@@ -223,25 +135,41 @@ function DiagnosticTopicSelectionState({
               type="button"
               onClick={() => setPreviewTopicId(topic.id)}
               className={cn(
-                "rounded-2xl border px-4 py-4 text-left transition-all",
+                "flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors",
                 isPreview
-                  ? "border-accent/40 bg-accent/10 shadow-[0_0_20px_-8px_rgba(139,92,246,0.3)]"
-                  : "surface-cutout hover:border-accent/20 hover:bg-card/80"
+                  ? "border-l-3 border-l-accent bg-accent/8"
+                  : "hover:bg-white/4"
               )}
             >
-              <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-2xl border border-border bg-card text-lg">
-                  {topic.icon}
-                </span>
-                <div>
-                  <p className="text-sm font-semibold text-foreground">{topic.label}</p>
-                  <p className="text-xs text-muted-foreground">{definition?.points.length ?? 0} mapped points</p>
-                </div>
-              </div>
+              <span className="text-xl">{topic.icon}</span>
+              <span className="text-sm font-medium text-foreground">{topic.label}</span>
             </button>
           );
         })}
       </div>
+
+      {previewTopic ? (
+        <motion.div
+          key={previewTopic.id}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-xl border border-white/8 bg-white/4 p-5"
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">{previewTopic.icon}</span>
+            <h2 className="text-lg font-semibold text-foreground">{previewTopic.label}</h2>
+          </div>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            {previewDefinition.description}
+          </p>
+          <div className="mt-5">
+            <Button size="lg" onClick={() => startTopic(previewTopic.id)}>
+              Start diagnostic
+              <ArrowRight size={16} />
+            </Button>
+          </div>
+        </motion.div>
+      ) : null}
     </div>
   );
 }
@@ -256,10 +184,6 @@ function DiagnosticResultsSummary({
   const coveredCount = report.curriculumPoints.filter((point) => point.status === "covered").length;
   const partialCount = report.curriculumPoints.filter((point) => point.status === "partial").length;
   const misconceptionCount = report.curriculumPoints.filter((point) => point.status === "misconception").length;
-  const unassessedCount = report.curriculumPoints.filter((point) => point.status === "unassessed").length;
-  const recommendedMaterials = getRecommendedMaterialCards([report.topicId], 3).filter((material) =>
-    report.recommendedMaterialIds.includes(material.id)
-  );
   const railSummary = [
     { label: "Coverage", value: `${coveredCount}/${report.curriculumPoints.length}`, tone: "success" as const },
     {
@@ -300,7 +224,7 @@ function DiagnosticResultsSummary({
           <LearningOutcomePanel
             eyebrow="Diagnostic results"
             title={`Diagnostic complete for ${report.topicLabel}`}
-            summary="You now have a saved coverage map for this topic. Use it to move directly into weak-topic practice instead of guessing what to revise next."
+            summary="You now have a saved coverage map. Use it to focus your practice."
             tone={misconceptionCount > 0 ? "warning" : coveredCount > partialCount ? "success" : "accent"}
             progressLabel="Diagnostic confidence"
             progressValue={Math.round(report.confidence * 100)}
@@ -310,163 +234,44 @@ function DiagnosticResultsSummary({
               { label: `${misconceptionCount} misconceptions`, variant: misconceptionCount > 0 ? "danger" : "default" },
             ]}
             primaryAction={{
-              label: "Start weak-topic practice",
+              label: "Practice weak areas",
               href: "/revision/weak-areas",
             }}
             secondaryAction={{
-              label: "Open topic practice",
+              label: "Topic practice",
               href: `/revision/${report.topicId}/practice`,
               variant: "secondary",
             }}
-          >
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {[
-                { label: "Covered", value: coveredCount, tone: "success" as const },
-                { label: "Partial", value: partialCount, tone: "warning" as const },
-                { label: "Unassessed", value: unassessedCount, tone: "default" as const },
-                { label: "Misconceptions", value: misconceptionCount, tone: "danger" as const },
-              ].map((item) => (
-                <div key={item.label} className="surface-cutout rounded-2xl px-4 py-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    {item.label}
-                  </p>
-                  <div className="mt-2 flex items-center justify-between gap-3">
-                    <p className="text-2xl font-bold text-foreground">{item.value}</p>
-                    <Badge variant={item.tone}>{item.label}</Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </LearningOutcomePanel>
+          />
 
-          <Card variant="task" className="p-5 sm:p-6">
-            <div className="flex items-center gap-2">
-              <Target size={15} className="text-accent" />
-              <h3 className="text-sm font-semibold text-foreground">Point-by-point coverage</h3>
-            </div>
-
-            <div className="mt-4 space-y-3">
+          <div>
+            <h3 className="text-sm font-semibold text-foreground">Coverage by point</h3>
+            <div className="mt-3 space-y-1">
               {report.curriculumPoints.map((point) => (
-                <div key={point.pointId} className="surface-cutout rounded-2xl px-4 py-4">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono text-xs text-accent">{point.pointId}</span>
-                        <p className="text-sm font-semibold text-foreground">{point.label}</p>
-                        <Badge variant={pointVariant(point.status)}>{pointLabel(point.status)}</Badge>
-                      </div>
-                      {point.notes ? (
-                        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{point.notes}</p>
-                      ) : null}
-                    </div>
-                    <div className="min-w-[180px] space-y-2">
-                      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                        <span>Coverage signal</span>
-                        <span>{pointProgress(point.status)}%</span>
-                      </div>
-                      <ProgressBar value={pointProgress(point.status)} size="sm" />
-                    </div>
-                  </div>
-
-                  <div className="mt-3 grid gap-3 lg:grid-cols-2">
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                        Matched terms
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {point.matchedTerms.length > 0 ? (
-                          point.matchedTerms.map((term) => (
-                            <span
-                              key={`${point.pointId}-${term}`}
-                              className="rounded-lg bg-success/10 px-2.5 py-1 text-[11px] text-success"
-                            >
-                              {term}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-xs text-muted-foreground">No clear signals matched yet.</span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                        Still missing
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {point.missingTerms.length > 0 ? (
-                          point.missingTerms.map((term) => (
-                            <span
-                              key={`${point.pointId}-missing-${term}`}
-                              className="rounded-lg bg-warning/10 px-2.5 py-1 text-[11px] text-warning"
-                            >
-                              {term}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-xs text-muted-foreground">No major missing signals.</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                <div key={point.pointId} className="flex items-center gap-3 rounded-lg py-2 px-3 hover:bg-white/3">
+                  <span className="w-14 shrink-0 font-mono text-[11px] text-muted-foreground">{point.pointId}</span>
+                  <span className="min-w-0 flex-1 text-sm text-foreground">{point.label}</span>
+                  <Badge variant={pointVariant(point.status)}>{pointLabel(point.status)}</Badge>
+                  {point.notes ? (
+                    <span className="hidden max-w-[180px] truncate text-xs text-muted-foreground sm:inline">{point.notes}</span>
+                  ) : null}
                 </div>
               ))}
             </div>
-          </Card>
-
-          <div className="grid gap-4 xl:grid-cols-2">
-            <Card variant="warning" className="p-5">
-              <div className="flex items-center gap-2">
-                <ClipboardCheck size={14} className="text-warning" />
-                <h3 className="text-sm font-semibold text-foreground">Next revision targets</h3>
-              </div>
-
-              <div className="mt-4 space-y-2">
-                {report.suggestedNextTargets.length > 0 ? (
-                  report.suggestedNextTargets.map((target) => (
-                    <div
-                      key={target}
-                      className="rounded-xl border border-border bg-surface/30 px-3 py-3 text-sm text-foreground"
-                    >
-                      {target}
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    No urgent weak targets remain for this topic.
-                  </p>
-                )}
-              </div>
-            </Card>
-
-            <Card variant="support" className="p-5">
-              <div className="flex items-center gap-2">
-                <Sparkles size={14} className="text-accent" />
-                <h3 className="text-sm font-semibold text-foreground">Suggested support material</h3>
-              </div>
-
-              <div className="mt-4 space-y-2">
-                {recommendedMaterials.length > 0 ? (
-                  recommendedMaterials.map((material) => (
-                    <div key={material.id} className="surface-cutout rounded-xl px-3 py-3">
-                      <p className="text-sm font-medium text-foreground">{material.title}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">{material.description}</p>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Open the topic resources route to review supporting material.
-                  </p>
-                )}
-              </div>
-
-              <div className="mt-4">
-                <Link href={`/revision/${report.topicId}/resources`}>
-                  <Button variant="ghost">Review topic resources</Button>
-                </Link>
-              </div>
-            </Card>
           </div>
+
+          {report.suggestedNextTargets.length > 0 ? (
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">What to revise next</h3>
+              <ul className="mt-2 space-y-1">
+                {report.suggestedNextTargets.map((target) => (
+                  <li key={target} className="text-sm text-muted-foreground">
+                    &bull; {target}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
@@ -889,54 +694,25 @@ export function DiagnosticWorkspace({
       contextStrip={
         <TaskContextStrip
           eyebrow="Diagnostic"
-          breadcrumb={`${activeTopic.label} - Step ${activeStepIndex} of ${activeStepCount || 1}`}
-          meta={
-            stage === "baseline"
-              ? "Write one baseline explanation first. The system will only ask targeted follow-ups where coverage is still weak."
-              : "One follow-up at a time. This step is only checking the missing evidence that still blocks a confident result."
-          }
+          breadcrumb={`${activeTopic.label}`}
           status={
-            <div className="flex flex-wrap justify-end gap-2">
-              <Badge variant={stage === "baseline" ? "accent" : "warning"}>
-                {stage === "baseline" ? "Baseline answer" : `Follow-up ${followUps.length + 1}`}
-              </Badge>
-              {analysis ? (
-                <Badge variant={activeConfidence >= 70 ? "success" : "default"}>
-                  {activeConfidence}% confidence
-                </Badge>
-              ) : null}
-            </div>
+            <span className="text-xs tabular-nums text-muted-foreground">
+              Step {activeStepIndex} / {activeStepCount || 1}
+            </span>
           }
         />
       }
       task={
-        <TaskPanel title={activePrompt} subtitle={activePromptDescription}>
+        <TaskPanel title={activePrompt}>
           {stage === "follow-up" && targetedPoint ? (
-            <div className="mt-5 rounded-2xl border border-warning/20 bg-warning/10 px-4 py-3">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-warning">
-                    Targeted point
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-foreground">
-                    {targetedPoint.pointId} {targetedPoint.label}
-                  </p>
-                </div>
-                <Badge variant={pointVariant(targetedPoint.status)}>{pointLabel(targetedPoint.status)}</Badge>
-              </div>
-            </div>
+            <p className="text-sm text-warning">
+              Checking: {targetedPoint.pointId} {targetedPoint.label}
+            </p>
           ) : null}
         </TaskPanel>
       }
       response={
-        <TaskResponsePanel
-          label={stage === "baseline" ? "Your baseline explanation" : "Your follow-up answer"}
-          description={
-            stage === "baseline"
-              ? "Mention terms, links, processes, and examples where relevant. The diagnostic works best with a natural exam-style explanation."
-              : "Answer only the missing concept or clarification this follow-up is asking for."
-          }
-        >
+        <TaskResponsePanel>
           {error ? <DiagnosticError error={error} /> : null}
 
           <textarea
@@ -949,21 +725,16 @@ export function DiagnosticWorkspace({
               }
               setError("");
             }}
-            rows={stage === "baseline" ? 12 : 8}
+            rows={stage === "baseline" ? 10 : 6}
             placeholder={
               stage === "baseline"
-                ? "Explain the topic in your own words. Mention terms, examples, design choices, and consequences where relevant."
-                : "Add the missing concept, clarification, or example this follow-up is asking for."
+                ? "Explain what you already know about this topic..."
+                : "Answer the follow-up question..."
             }
-            className="mt-4 min-h-[220px] w-full rounded-[24px] border border-border bg-surface/40 px-5 py-4 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/30"
+            className="w-full rounded-xl border border-border bg-surface/40 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/30"
           />
 
-          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-[11px] text-muted-foreground/70">
-              Deterministic matching against structured topic points, key terms, misconception rules, and follow-up history.
-            </p>
-            <p className="text-[11px] text-muted-foreground/50 tabular-nums">{activeWordCount} words</p>
-          </div>
+          <p className="text-right text-[11px] tabular-nums text-muted-foreground/50">{activeWordCount} words</p>
         </TaskResponsePanel>
       }
       feedback={
@@ -972,63 +743,18 @@ export function DiagnosticWorkspace({
             tone={targetedPoint.status === "misconception" ? "danger" : targetedPoint.status === "covered" ? "success" : "warning"}
             title={feedbackTitle}
             summary={feedbackSummary}
-          >
-            <div className="grid gap-4 lg:grid-cols-2">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  Matched terms so far
-                </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {targetedPoint.matchedTerms.length > 0 ? (
-                    targetedPoint.matchedTerms.map((term) => (
-                      <span
-                        key={`${targetedPoint.pointId}-${term}`}
-                        className="rounded-lg bg-success/10 px-2.5 py-1 text-[11px] text-success"
-                      >
-                        {term}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-xs text-muted-foreground">No matched terms for this point yet.</span>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  Still missing
-                </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {targetedPoint.missingTerms.length > 0 ? (
-                    targetedPoint.missingTerms.map((term) => (
-                      <span
-                        key={`${targetedPoint.pointId}-missing-${term}`}
-                        className="rounded-lg bg-warning/10 px-2.5 py-1 text-[11px] text-warning"
-                      >
-                        {term}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-xs text-muted-foreground">No major missing signals for this point.</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </TaskFeedbackPanel>
+          />
         ) : undefined
       }
       primaryAction={{
-        label:
-          stage === "baseline"
-            ? "Start diagnostic for this topic"
-            : "Continue to next diagnostic check",
+        label: stage === "baseline" ? "Submit" : "Continue",
         onClick: () => void (stage === "baseline" ? runInitialAnalysis() : runFollowUp()),
         loading: isSubmitting,
       }}
       secondaryAction={
         stage === "follow-up" && analysis
           ? {
-              label: "Finish diagnostic and view results",
+              label: "View results",
               onClick: () => void persistAndShowResults(analysis),
               disabled: isSubmitting,
               variant: "secondary",

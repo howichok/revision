@@ -5,9 +5,20 @@ import { ArrowRight, Target } from "lucide-react";
 import { PageContainer } from "@/components/layout/page-container";
 import { RevisionSubnav } from "@/components/revision/revision-subnav";
 import { useAppData } from "@/components/providers/app-data-provider";
-import { Badge, Card, ProgressBar } from "@/components/ui";
 import { getRevisitQueue, getWeakestTopics } from "@/lib/progress";
 import { getTopicById } from "@/lib/types";
+
+function urgencyColor(urgency: string) {
+  if (urgency === "due-now") return "border-l-red-500";
+  if (urgency === "revisit-soon") return "border-l-amber-500";
+  return "border-l-emerald-500";
+}
+
+function urgencyLabel(urgency: string) {
+  if (urgency === "due-now") return "text-red-400";
+  if (urgency === "revisit-soon") return "text-amber-400";
+  return "text-emerald-400";
+}
 
 export default function WeakAreasPage() {
   const { activityHistory, diagnostic, onboarding, revisionProgress } = useAppData();
@@ -25,163 +36,96 @@ export default function WeakAreasPage() {
       <div className="space-y-6">
         <RevisionSubnav activeRoute="weak-areas" />
 
-        <Card variant="warning" className="p-5 sm:p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            Review and repeat
-          </p>
-          <h1 className="mt-1 text-2xl font-bold text-foreground sm:text-3xl">
-            Focus on the topics that still need work
+        <div className="mx-auto max-w-2xl">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            Weak areas
           </h1>
-          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">
-            This route is for targeted repetition. It ranks topics by diagnostic weakness, practice gaps,
-            review coverage, and recency so you know exactly what to revisit next.
+          <p className="mt-1 text-sm text-muted-foreground">
+            Topics ranked by what needs the most attention right now.
           </p>
-        </Card>
 
-        {revisitQueue.length > 0 ? (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {revisitQueue.map((item) => (
-              <Card
-                key={item.topicId}
-                variant={
-                  item.urgency === "due-now"
-                    ? "danger"
-                    : item.urgency === "revisit-soon"
-                      ? "warning"
-                      : "success"
-                }
-                className="h-full p-5"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl">{item.topicIcon}</span>
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">{item.topicLabel}</p>
-                        <p className="text-[11px] text-muted-foreground">
-                          {item.urgency === "due-now"
-                            ? "Due now"
-                            : item.urgency === "revisit-soon"
-                              ? "Revisit soon"
-                              : "Keep warm"}
-                        </p>
-                      </div>
-                    </div>
-                    <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                      {item.nextAction}
-                    </p>
+          <div className="mt-6 space-y-1">
+            {revisitQueue.length > 0 ? (
+              revisitQueue.map((item) => (
+                <div
+                  key={item.topicId}
+                  className={`flex items-center gap-4 rounded-lg border-l-3 py-3 pl-4 pr-3 transition-colors hover:bg-white/3 ${urgencyColor(item.urgency)}`}
+                >
+                  <span className="shrink-0 text-lg">{item.topicIcon}</span>
+
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-foreground">{item.topicLabel}</p>
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">{item.nextAction}</p>
                   </div>
-                  <Badge
-                    variant={
-                      item.urgency === "due-now"
-                        ? "danger"
-                        : item.urgency === "revisit-soon"
-                          ? "warning"
-                          : "success"
-                    }
+
+                  <span className={`shrink-0 text-[11px] font-medium ${urgencyLabel(item.urgency)}`}>
+                    {item.urgency === "due-now"
+                      ? "Due now"
+                      : item.urgency === "revisit-soon"
+                        ? "Revisit soon"
+                        : "Keep warm"}
+                  </span>
+
+                  <Link
+                    href={`/revision/${item.topicId}/practice`}
+                    className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent-soft"
                   >
-                    {item.priority}
-                  </Badge>
+                    Practice
+                    <ArrowRight size={12} />
+                  </Link>
                 </div>
+              ))
+            ) : diagnostic ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                No revisit queue yet. Start practice on any topic to build one.
+              </p>
+            ) : weakestTopics.length > 0 ? (
+              weakestTopics.map((topic) => {
+                const pct = Math.round((topic.score / topic.maxScore) * 100);
+                const topicInfo = getTopicById(topic.category);
 
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <div className="surface-cutout rounded-xl px-3 py-3">
-                    <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                      Practice
-                    </p>
-                    <p className="mt-2 text-lg font-semibold text-foreground">{item.practicePercent}%</p>
-                  </div>
-                  <div className="surface-cutout rounded-xl px-3 py-3">
-                    <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                      Diagnostic
-                    </p>
-                    <p className="mt-2 text-lg font-semibold text-foreground">
-                      {item.diagnosticPercent ?? "\u2014"}%
-                    </p>
-                  </div>
-                </div>
+                return (
+                  <div
+                    key={topic.category}
+                    className="flex items-center gap-4 rounded-lg border-l-3 border-l-amber-500 py-3 pl-4 pr-3"
+                  >
+                    <span className="shrink-0 text-lg">{topicInfo?.icon}</span>
 
-                <div className="mt-4 space-y-2">
-                  {item.reasons.map((reason) => (
-                    <div
-                      key={`${item.topicId}-${reason}`}
-                      className="surface-cutout rounded-xl px-3 py-2 text-xs text-muted-foreground"
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-foreground">{topic.topic}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Diagnostic score: {pct}%
+                      </p>
+                    </div>
+
+                    <Link
+                      href={`/revision/${topic.category}/practice`}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent-soft"
                     >
-                      {reason}
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-5 flex flex-wrap gap-2">
-                  <Link href={`/revision/${item.topicId}/practice`}>
-                    <span className="inline-flex items-center gap-1 rounded-xl bg-accent px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-soft">
-                      Start practice
-                      <ArrowRight size={14} />
-                    </span>
-                  </Link>
-                  <Link href={`/revision/${item.topicId}/answer-check`}>
-                    <span className="inline-flex items-center gap-1 rounded-xl border border-border bg-surface/30 px-3 py-2 text-sm text-foreground transition-colors hover:border-accent/20 hover:bg-card">
-                      Check an answer
-                    </span>
-                  </Link>
-                </div>
-              </Card>
-            ))}
-          </div>
-        ) : diagnostic ? (
-          <Card variant="support" className="p-5">
-            <p className="text-sm text-muted-foreground">
-              No revisit queue has been generated yet. Start practice on any topic to build one.
-            </p>
-          </Card>
-        ) : weakestTopics.length > 0 ? (
-          <div className="space-y-4">
-            {weakestTopics.map((topic) => {
-              const pct = Math.round((topic.score / topic.maxScore) * 100);
-              const topicInfo = getTopicById(topic.category);
-
-              return (
-                <Card key={topic.category} variant="warning" className="p-5">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">
-                        {topicInfo?.icon} {topic.topic}
-                      </p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        This is one of your lowest scored topics from the latest diagnostic.
-                      </p>
-                    </div>
-                    <div className="min-w-[220px]">
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>Diagnostic score</span>
-                        <span>{pct}%</span>
-                      </div>
-                      <ProgressBar value={pct} className="mt-3" size="sm" />
-                    </div>
+                      Practice
+                      <ArrowRight size={12} />
+                    </Link>
                   </div>
-                </Card>
-              );
-            })}
-          </div>
-        ) : (
-          <Card variant="support" className="p-5">
-            <div className="flex items-center gap-2">
-              <Target size={15} className="text-warning" />
-              <p className="text-sm font-semibold text-foreground">No weak-area data yet</p>
-            </div>
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              Run the diagnostic first so the system can tell you which topics need targeted review.
-            </p>
-            <div className="mt-4">
-              <Link href="/revision/diagnostic">
-                <span className="inline-flex items-center gap-1 rounded-xl bg-accent px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-soft">
+                );
+              })
+            ) : (
+              <div className="py-12 text-center">
+                <Target size={20} className="mx-auto text-muted-foreground/50" />
+                <p className="mt-3 text-sm font-medium text-foreground">No weak-area data yet</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Run the diagnostic first so the system can rank your topics.
+                </p>
+                <Link
+                  href="/revision/diagnostic"
+                  className="mt-4 inline-flex items-center gap-1 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-soft"
+                >
                   Start diagnostic
                   <ArrowRight size={14} />
-                </span>
-              </Link>
-            </div>
-          </Card>
-        )}
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </PageContainer>
   );
